@@ -311,14 +311,36 @@ class Game:
             self.remove_dead(coord)
 
     def is_valid_move(self, coords : CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        # if source coordinates are not valid or destination coordinates are not valid, false
+        # is_valid_coord checks if coordinate is within board dimensions
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
+        # set unit to source coordinates
         unit = self.get(coords.src)
+
+        #if source coordinates are null or player is not an attacker, false
         if unit is None or unit.player != self.next_player:
             return False
         unit = self.get(coords.dst)
-        return (unit is None)
+
+        #todo: check if (coords.dest) is already occupied
+        if not self.is_empty(coords.dest):
+            return False
+        unit = self.get(coords.dest)
+
+        #todo: if unit is engaged in combat (has an opponent adjacent), return false
+        if not self.is_empty((coords.src).iter_adjacent()) and self.get((coords.src).iter_adjacent()).player != self.player:
+            return False
+        
+        #todo: if unit is an attacker, AI, Firewall and Program can only move up or left; its Tech and Virus can move all directions
+        if unit.player == Player.Attacker and (self.type == UnitType.AI or self.type == UnitType.Firewall or self.type == UnitType.Program) and self.get(coords.src).row > self.get(coords.dst).row and self.get(coords.src).col > self.get(coords.dst).col :
+            return False
+
+        #todo: if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
+        if unit.player == Player.Defender and (self.type == UnitType.AI or self.type == UnitType.Firewall or self.type == UnitType.Program) and self.get(coords.src).row < self.get(coords.dst).row and self.get(coords.src).col < self.get(coords.dst).col :
+            return False
+   
+        return (unit is None) #don't understand this, the method always returns false?
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
