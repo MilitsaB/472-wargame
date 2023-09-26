@@ -310,7 +310,7 @@ class Game:
             target.mod_health(health_delta)
             self.remove_dead(coord)
 
-    def is_valid_move(self, coords : CoordPair) -> bool:
+    def is_valid_move(self, coords: CoordPair) -> bool:
         # if source coordinates are not valid or destination coordinates are not valid, false
         # is_valid_coord checks if coordinate is within board dimensions
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
@@ -318,31 +318,47 @@ class Game:
         # set unit to source coordinates
         unit = self.get(coords.src)
 
-        #if source coordinates are null or player is not an attacker, false
+        # if source coordinates are null, false
         if unit is None or unit.player != self.next_player:
+            print("Sorry, invalid move. This source is null")
             return False
-        unit = self.get(coords.dst)
 
-        #todo: check if (coords.dest) is already occupied
-        if not self.is_empty(coords.dest):
+        # if player is not the player that should be playing, false
+        if unit is None or unit.player != self.next_player:
+            print("Sorry, invalid move. This destination is occupied.")
             return False
-        unit = self.get(coords.dest)
 
-        #todo: if unit is engaged in combat (has an opponent adjacent), return false
-        if not self.is_empty((coords.src).iter_adjacent()) and self.get((coords.src).iter_adjacent()).player != self.player:
+        # if (coords.dst) is already occupied, false
+        if not self.is_empty(coords.dst):
+            print("Sorry, invalid move. This destination is occupied.")
             return False
+
+        # if src is engaged in combat (has an opponent adjacent), return false
+        # loop over the return of the iter_adjacent method
+        for adjacent_coordinate in coords.src.iter_adjacent():
+            if not self.is_empty(adjacent_coordinate):
+                if self.get(adjacent_coordinate).player != unit.player:
+                    print("Sorry, invalid move. This player is engaged in combat.")
+                    return False
         
-        #todo: if unit is an attacker, AI, Firewall and Program can only move up or left; its Tech and Virus can move all directions
-        if unit.player == Player.Attacker and (self.type == UnitType.AI or self.type == UnitType.Firewall or self.type == UnitType.Program) and self.get(coords.src).row > self.get(coords.dst).row and self.get(coords.src).col > self.get(coords.dst).col :
-            return False
+        # if src is an attacker, AI, Firewall and Program can only move up or left; its Tech and Virus can move all directions
+        if unit.player == Player.Attacker:
+            if unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program:
+                if coords.src.row < coords.dst.row or coords.src.col > coords.dst.col:
+                    print("An attacker piece of type " + unit.type.name + " can only move up or left")
+                    return False
 
-        #todo: if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
-        if unit.player == Player.Defender and (self.type == UnitType.AI or self.type == UnitType.Firewall or self.type == UnitType.Program) and self.get(coords.src).row < self.get(coords.dst).row and self.get(coords.src).col < self.get(coords.dst).col :
-            return False
-   
-        return (unit is None) #don't understand this, the method always returns false?
+        # if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
+        if unit.player == Player.Defender:
+            if unit.type == UnitType.AI or unit.type == UnitType.Firewall or unit.type == UnitType.Program:
+                if coords.src.row > coords.dst.row and coords.src.col < coords.dst.col:
+                    print("A defender piece of type: " + src.type + " can only move down or right")
+                    return False
 
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
+        unit = self.get(coords.dst)
+        return (unit is None)
+
+    def perform_move(self, coords: CoordPair) -> Tuple[bool,str]:
         """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
             self.set(coords.dst,self.get(coords.src))
