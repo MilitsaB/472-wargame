@@ -246,7 +246,6 @@ class Stats:
 
 
 ##############################################################################################################
-
 @dataclass(slots=True)
 class Game:
     """Representation of the game state."""
@@ -319,108 +318,126 @@ class Game:
             target.mod_health(health_delta)
             self.remove_dead(coord)
 
-    def is_an_attack(self, coords: CoordPair) -> bool:
-        # if source coordinates are not valid or destination coordinates are not valid, false
-        # is_valid_coord checks if coordinate is within board dimensions
-        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
-            return False
-        # set unit to source coordinates
-        src = self.get(coords.src)
-        dst = self.get(coords.dst)
-
-        for adjacent_coordinate in coords.src.iter_adjacent():
-            if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
-                if self.get(adjacent_coordinate).player != src.player:
-                    if coords.dst == adjacent_coordinate:
-                        damage = src.damage_table[src.type.value][dst.type.value]
-                        self.mod_health(coords.src, -damage)
-                        self.mod_health(coords.dst, -damage)
-                        print("Attack initiated.")
-
-
-                    else:
-                        print("Sorry, invalid move. This player is engaged in combat.")
-
-                    return False
+    """CODE MODIFIED OR ADDED BY OUR TEAM FOR D1"""
 
     def is_valid_move(self, coords: CoordPair) -> Tuple[bool, str]:
+
         # if source coordinates are not valid or destination coordinates are not valid, false
         # is_valid_coord checks if coordinate is within board dimensions
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
-            return False, "invalid move"
-        # set unit to source coordinates
+            return False, "Invalid move"
+
         src = self.get(coords.src)
         dst = self.get(coords.dst)
 
-        # if source coordinates are null, false
-        if src is None or src.player != self.next_player:
-            print("Sorry, invalid move. This source is null")
-            return False, "invalid move"
+        # if src is empty, return false
+        if src is None:
+            print("Sorry, source is empty, no player found at location.")
+            return False, "Invalid move"
 
         # if player is not the player that should be playing, false
-        if src is None or src.player != self.next_player:
-            print("Sorry, invalid move. This is " + self.next_player + "'s turn")
-            return False, "invalid move"
+        if src.player != self.next_player:
+            print("Sorry, this is " + self.next_player.name + "'s turn.")
+            return False, "Invalid move"
 
-        # if (coords.dst) is already occupied, false
-        if not self.is_empty(coords.dst) and dst.type == src.type:
-            print("Sorry, invalid move. This destination is occupied.")
-            return False, "invalid move"
+        # if src and dst is the same, player is self-destructing, return true and indicate that it is a self-destruct
+        if src.player == dst.player:
+            return True, "self-destruct"
 
         # if dst is not adjacent, return false
         if coords.dst not in coords.src.iter_adjacent():
-            print("Sorry, invalid move. Destination is not adjacent to the source.")
-            return False, "invalid move"
+            print("Sorry, this destination is not adjacent to the source.")
+            return False, "Invalid move"
 
-        # if src is engaged in combat (has an opponent adjacent), return false
-        # loop over the return of the iter_adjacent method
-        for adjacent_coordinate in coords.src.iter_adjacent():
-            if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
-                if self.get(adjacent_coordinate).player != src.player:
-                    if coords.dst == adjacent_coordinate:
-                        return True, "attack"
+        # if src is AI and player is repairing his own Tech or Virus with health level less than 9,
+        # return true and indicate that it is a repair, else return false
+        if src.type == UnitType.AI and dst.player == src.player:
+            if (dst.type == UnitType.Tech or dst.type == UnitType.Virus) and dst.health < 9:
+                return True, "repair"
+            else:
+                print("Sorry, AI cannot repair player" + dst.player.name + ".")
+                return False, "Invalid move"
 
-                    else:
-                        print("Sorry, invalid move. This player is engaged in combat.")
-                        return False, "invalid move"
+        # if src is AI, Firewall or Program and is trying to move while engaged in combat (has an opponent adjacent), return false
+        # if src is attacking, return true and indicate that it is an attack
+        if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
+            # loop over the return of the iter_adjacent to see if player is engaged in combat
+            for adjacent_coordinate in coords.src.iter_adjacent():
+                if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
+                    if self.get(adjacent_coordinate).player != src.player:
+                        if coords.dst == adjacent_coordinate:
+                            return True, "attack"
+                        else:
+                            print("Sorry, this player is engaged in combat.")
+                            return False, "Invalid move"
+
+        # if src is Tech or Virus, player can move regardless of being in combat
+        # if dst is not empty, src may be attacking, but Tech might also be repairing
+        if src.type == UnitType.Tech or src.type == UnitType.Virus:
+            if not self.is_empty(coords.dst):
+                if dst.player != src.player:
+                    return True, "attack"
+
+                # if src is Tech, player can repair his own team if health is less than 9, otherwise return false
+                elif src.type == UnitType.Tech and dst.player == src.player:
+                    if (dst.type == UnitType.AI or dst.type == UnitType.Firewall or dst.type == UnitType.Program) and dst.health < 9:
+                        return True, "repair"
+                else:
+                    return False, "Invalid move"
 
         # if src is an attacker, AI, Firewall and Program can only move up or left; its Tech and Virus can move all directions
         if src.player == Player.Attacker:
-            if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
+            if src.type == UnitType.AI or UnitType.Firewall or UnitType.Program:
                 if coords.src.row < coords.dst.row or coords.src.col < coords.dst.col:
                     print("An attacker piece of type " + src.type.name + " can only move up or left")
-                    return False, "invalid move"
+                    return False, "Invalid move"
 
         # if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
         if src.player == Player.Defender:
-            if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
+            if src.type == UnitType.AI or UnitType.Firewall or UnitType.Program:
                 if coords.src.row > coords.dst.row and coords.src.col > coords.dst.col:
-                    print("A defender piece of type: " + src.type + " can only move down or right")
-                    return False, "invalid move"
+                    print("A defender piece of type: " + src.type.name + " can only move down or right")
+                    return False, "Invalid move"
 
         return dst is None, "valid move"
 
     def perform_attack(self, coords: CoordPair):
-        print("Attack initiated.")
         src = self.get(coords.src)
         dst = self.get(coords.dst)
         damage = src.damage_table[src.type.value][dst.type.value]
         self.mod_health(coords.src, -damage)
         self.mod_health(coords.dst, -damage)
 
+    def perform_repair(self, coords: CoordPair):
+        src = self.get(coords.src)
+        dst = self.get(coords.dst)
+        repair = src.repair_table[src.type.value][dst.type.value]
+        self.mod_health(coords.src, repair)
+        self.mod_health(coords.dst, repair)
+
+    def perform_self_destruction(self, coords: CoordPair):
+        self.mod_health(coords.src, -self.get(coords.src).health)
+
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
-        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
+        """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type = self.is_valid_move(coords)
+        print(move_type)
         if is_valid:
-            if move_type  == "valid move":
+            if move_type == "valid move":
                 self.set(coords.dst, self.get(coords.src))
                 self.set(coords.src, None)
-                return (True, "")
-            if move_type  == "attack":
+                return (True, "Move initiated")
+            if move_type == "attack":
                 self.perform_attack(coords)
-                return (True, "")
+                return (True, "Attack initiated")
+            if move_type == "repair":
+                self.perform_repair(coords)
+                return (True, "Repair initiated")
+            if move_type == "self-destruct":
+                self.perform_self_destruction(coords)
+                return (True, "Self-destruction initiated")
 
-        return (False, "invalid move")
+        return (False, "Invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
