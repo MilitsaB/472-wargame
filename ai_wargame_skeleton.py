@@ -152,6 +152,21 @@ class Coord:
         yield Coord(self.row + 1, self.col)
         yield Coord(self.row, self.col + 1)
 
+    # Method added by our team
+    def iter_all8_adjacent(self) -> Iterable[Coord]:
+        """Iterates over all 8 adjacent coordinates including diagonals."""
+
+        # Check all 8 directions
+        yield Coord(self.row - 1, self.col)
+        yield Coord(self.row + 1, self.col)
+        yield Coord(self.row, self.col - 1)
+        yield Coord(self.row, self.col + 1)
+
+        yield Coord(self.row - 1, self.col - 1)
+        yield Coord(self.row - 1, self.col + 1)
+        yield Coord(self.row + 1, self.col - 1)
+        yield Coord(self.row + 1, self.col + 1)
+
     @classmethod
     def from_string(cls, s: str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
@@ -417,6 +432,9 @@ class Game:
 
     def perform_self_destruction(self, coords: CoordPair):
         self.mod_health(coords.src, -self.get(coords.src).health)
+        for adjacent_coordinate in coords.src.iter_all8_adjacent():
+            if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
+                self.mod_health(adjacent_coordinate, -2)
 
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
