@@ -356,7 +356,7 @@ class Game:
             return False, "Invalid move"
 
         # if src and dst is the same, player is self-destructing, return true and indicate that it is a self-destruct
-        if src.player == dst.player:
+        if not self.is_empty(coords.dst) and src == dst:
             return True, "self-destruct"
 
         # if dst is not adjacent, return false
