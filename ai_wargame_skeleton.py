@@ -433,8 +433,9 @@ class Game:
     def perform_self_destruction(self, coords: CoordPair):
         self.mod_health(coords.src, -self.get(coords.src).health)
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
-            if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
-                self.mod_health(adjacent_coordinate, -2)
+            if self.is_valid_coord(adjacent_coordinate):
+                if not self.is_empty(adjacent_coordinate):
+                    self.mod_health(adjacent_coordinate, -2)
 
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
@@ -702,7 +703,10 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
-            print(f"{winner.name} wins!")
+            print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
+            break
+        if game.turns_played == 100:
+            print(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
