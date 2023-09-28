@@ -335,7 +335,7 @@ class Game:
 
     """CODE MODIFIED OR ADDED BY OUR TEAM FOR D1"""
 
-    def is_valid_move(self, coords: CoordPair) -> Tuple[bool, str]:
+    def is_valid_move(self, coords: CoordPair) -> Tuple[bool, str]: 
 
         # if source coordinates are not valid or destination coordinates are not valid, false
         # is_valid_coord checks if coordinate is within board dimensions
@@ -435,17 +435,45 @@ class Game:
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
             if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
-
+     
+    def log_move(self, move_type ,coords:CoordPair):
+        with open("log.txt", "a",encoding="utf-8") as file:
+            
+            print(self.next_player)
+            file.write("Turn number: "+str(self.turns_played)+"\n")
+            
+            if self.next_player==Player.Attacker and move_type=="valid move":
+                file.write("Attacker moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
+            elif self.next_player==Player.Defender and move_type=="valid move":
+                file.write("Defender moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
+                
+            if self.next_player==Player.Attacker and move_type=="attack":
+                file.write("Attacker attacked "+ str(coords) + "\n")
+            elif self.next_player==Player.Defender and move_type=="attack":
+                file.write("Defender attacked "+ str(coords) + "\n")
+                
+            if self.next_player==Player.Attacker and move_type=="repair":
+                file.write("Attacker repaired "+ str(coords) + "\n")
+            elif self.next_player==Player.Defender and move_type=="repair":
+                file.write("Defender repaired "+ str(coords) + "\n")
+                
+            if self.next_player==Player.Attacker and move_type=="self-destruct":
+                file.write("Attacker self-destruct\n")
+            elif self.next_player==Player.Defender and move_type=="self-destruct":
+                file.write("Defender self-destruct\n")
+            
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type = self.is_valid_move(coords)
         print(move_type)
         if is_valid:
             if move_type == "valid move":
+                self.log_move(move_type,coords)
                 self.set(coords.dst, self.get(coords.src))
                 self.set(coords.src, None)
                 return (True, "Move initiated")
             if move_type == "attack":
+                self.log_move(move_type,coords)
                 self.perform_attack(coords)
                 return (True, "Attack initiated")
             if move_type == "repair":
@@ -487,6 +515,9 @@ class Game:
                 else:
                     output += f"{str(unit):^3} "
             output += "\n"
+        with open("log.txt", "a",encoding="utf-8") as file:
+            file.write("Board:\n"+output)
+
         return output
 
     def __str__(self) -> str:
@@ -671,6 +702,9 @@ def main():
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     args = parser.parse_args()
+    
+    with open("log.txt", "w",encoding="utf-8") as file:
+        file.write("Args:\n"+str(args)+"\n")
 
     # parse the game type
     if args.game_type == "attacker":
