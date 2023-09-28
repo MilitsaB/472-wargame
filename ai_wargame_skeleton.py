@@ -378,7 +378,7 @@ class Game:
         if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
             # loop over the return of the iter_adjacent to see if player is engaged in combat
             for adjacent_coordinate in coords.src.iter_adjacent():
-                if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
+                if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
                     if self.get(adjacent_coordinate).player != src.player:
                         if coords.dst == adjacent_coordinate:
                             return True, "attack"
