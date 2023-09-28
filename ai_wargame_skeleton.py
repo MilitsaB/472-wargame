@@ -705,10 +705,12 @@ def main():
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
+    parser.add_argument('--max_turns', type=int, help='max number of turns the game will go on for')
+
     args = parser.parse_args()
+            
     
-    with open("log.txt", "w",encoding="utf-8") as file:
-        file.write("Args:\n"+str(args)+"\n")
+
 
     # parse the game type
     if args.game_type == "attacker":
@@ -730,6 +732,11 @@ def main():
         options.max_time = args.max_time
     if args.broker is not None:
         options.broker = args.broker
+    if args.max_turns is not None:
+        options.max_turns=args.max_turns
+
+    with open("log.txt", "w",encoding="utf-8") as file:
+        file.write("Game Options:\n"+str(options)+"\n")
 
     # create a new game
     game = Game(options=options)
@@ -742,9 +749,10 @@ def main():
         if winner is not None:
             print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
             break
-        if game.turns_played == 100:
+        if game.turns_played == options.max_turns:
             print(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
-            break
+            winner=Player.Defender
+            exit(1)
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
         elif game.options.game_type == GameType.AttackerVsComp and game.next_player == Player.Attacker:
