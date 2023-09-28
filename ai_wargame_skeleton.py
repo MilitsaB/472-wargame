@@ -435,7 +435,11 @@ class Game:
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
             if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
-     
+            
+            if self.is_valid_coord(adjacent_coordinate):
+                if not self.is_empty(adjacent_coordinate):
+                    self.mod_health(adjacent_coordinate, -2)
+                    
     def log_move(self, move_type ,coords:CoordPair):
         with open("log.txt", "a",encoding="utf-8") as file:
             
@@ -461,7 +465,7 @@ class Game:
                 file.write("Attacker self-destruct\n")
             elif self.next_player==Player.Defender and move_type=="self-destruct":
                 file.write("Defender self-destruct\n")
-            
+
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type = self.is_valid_move(coords)
@@ -736,7 +740,10 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
-            print(f"{winner.name} wins!")
+            print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
+            break
+        if game.turns_played == 100:
+            print(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
             break
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
