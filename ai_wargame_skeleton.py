@@ -441,7 +441,7 @@ class Game:
                     self.mod_health(adjacent_coordinate, -2)
                     
     def log_move(self, move_type ,coords:CoordPair):
-        with open("log.txt", "a",encoding="utf-8") as file:
+        with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
             
             print(self.next_player)
             file.write("Turn number: "+str(self.turns_played)+"\n")
@@ -521,7 +521,7 @@ class Game:
                 else:
                     output += f"{str(unit):^3} "
             output += "\n"
-        with open("log.txt", "a",encoding="utf-8") as file:
+        with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
             file.write("Board:\n"+output)
 
         return output
@@ -738,7 +738,7 @@ def main():
     if args.max_turns is not None:
         options.max_turns=args.max_turns
         
-    with open("log.txt", "w",encoding="utf-8") as file:
+    with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
         file.write("Game Options:\n"+str(options)+"\n")
 
     # create a new game
@@ -750,7 +750,7 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
-            with open("log.txt", "a",encoding="utf-8") as file:
+            with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "a",encoding="utf-8") as file:
                 file.write(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.\n")
 
             print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
