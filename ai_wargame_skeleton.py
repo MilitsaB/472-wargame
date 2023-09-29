@@ -402,15 +402,15 @@ class Game:
 
         # if src is an attacker, AI, Firewall and Program can only move up or left; its Tech and Virus can move all directions
         if src.player == Player.Attacker:
-            if src.type == UnitType.AI or UnitType.Firewall or UnitType.Program:
+            if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
                 if coords.src.row < coords.dst.row or coords.src.col < coords.dst.col:
                     print("An attacker piece of type " + src.type.name + " can only move up or left")
                     return False, "Invalid move"
 
         # if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
         if src.player == Player.Defender:
-            if src.type == UnitType.AI or UnitType.Firewall or UnitType.Program:
-                if coords.src.row > coords.dst.row and coords.src.col > coords.dst.col:
+            if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
+                if coords.src.row > coords.dst.row or coords.src.col > coords.dst.col:
                     print("A defender piece of type: " + src.type.name + " can only move down or right")
                     return False, "Invalid move"
 
@@ -435,10 +435,6 @@ class Game:
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
             if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
-            
-            if self.is_valid_coord(adjacent_coordinate):
-                if not self.is_empty(adjacent_coordinate):
-                    self.mod_health(adjacent_coordinate, -2)
                     
     def log_move(self, move_type ,coords:CoordPair):
         with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
