@@ -595,7 +595,8 @@ class Game:
 
     def has_winner(self) -> Player | None:
         """Check if the game is over and returns winner"""
-        if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
+
+        if self.options.max_turns is not None and self.turns_played >= self.options.max_turns: 
             return Player.Defender
         elif self._attacker_has_ai:
             if self._defender_has_ai:
@@ -734,7 +735,7 @@ def main():
         options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns=args.max_turns
-
+        
     with open("log.txt", "w",encoding="utf-8") as file:
         file.write("Game Options:\n"+str(options)+"\n")
 
@@ -747,6 +748,9 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
+            with open("log.txt", "a",encoding="utf-8") as file:
+                file.write(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.\n")
+
             print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
             break
         if game.turns_played == options.max_turns:
