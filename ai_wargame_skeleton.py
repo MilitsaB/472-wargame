@@ -366,25 +366,24 @@ class Game:
 
         # if src is AI and player is repairing his own Tech or Virus with health level less than 9,
         # return true and indicate that it is a repair, else return false
-        if src.type == UnitType.AI and dst.player == src.player:
+        if src.type == UnitType.AI and not self.is_empty(coords.dst) and dst.player == src.player:
             if (dst.type == UnitType.Tech or dst.type == UnitType.Virus) and dst.health < 9:
                 return True, "repair"
             else:
-                print("Sorry, AI cannot repair player" + dst.player.name + ".")
+                print("Sorry, AI cannot repair player " + dst.player.name + ".")
                 return False, "Invalid move"
 
         # if src is AI, Firewall or Program and is trying to move while engaged in combat (has an opponent adjacent), return false
         # if src is attacking, return true and indicate that it is an attack
         if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
+            if not self.is_empty(coords.dst) and dst.player != src.player:
+                return True, "attack"
             # loop over the return of the iter_adjacent to see if player is engaged in combat
-            for adjacent_coordinate in coords.src.iter_adjacent():
-                if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
-                    if self.get(adjacent_coordinate).player != src.player:
-                        if coords.dst == adjacent_coordinate:
-                            return True, "attack"
-                        else:
-                            print("Sorry, this player is engaged in combat.")
-                            return False, "Invalid move"
+            else:
+                for adjacent_coordinate in coords.src.iter_adjacent():
+                    if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate) and self.get(adjacent_coordinate).player != src.player:
+                        print("Sorry, this player is engaged in combat.")
+                        return False, "Invalid move"
 
         # if src is Tech or Virus, player can move regardless of being in combat
         # if dst is not empty, src may be attacking, but Tech might also be repairing
@@ -427,7 +426,6 @@ class Game:
         src = self.get(coords.src)
         dst = self.get(coords.dst)
         repair = src.repair_table[src.type.value][dst.type.value]
-        self.mod_health(coords.src, repair)
         self.mod_health(coords.dst, repair)
 
     def perform_self_destruction(self, coords: CoordPair):
@@ -438,9 +436,8 @@ class Game:
                     
     def log_move(self, move_type ,coords:CoordPair):
         with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
-            
-            print(self.next_player)
-            file.write("Turn number: "+str(self.turns_played)+"\n")
+
+            file.write("\nTurn number: "+str(self.turns_played)+"\n")
             
             if self.next_player==Player.Attacker and move_type=="valid move":
                 file.write("Attacker moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
@@ -465,7 +462,6 @@ class Game:
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type = self.is_valid_move(coords)
-        print(move_type)
         if is_valid:
             if move_type == "valid move":
                 self.log_move(move_type,coords)
