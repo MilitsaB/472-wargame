@@ -433,7 +433,7 @@ class Game:
     def perform_self_destruction(self, coords: CoordPair):
         self.mod_health(coords.src, -self.get(coords.src).health)
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
-            if not self.is_empty(adjacent_coordinate) and self.is_valid_coord(adjacent_coordinate):
+            if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
             
             if self.is_valid_coord(adjacent_coordinate):
