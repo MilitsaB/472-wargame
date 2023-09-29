@@ -739,7 +739,7 @@ def main():
         options.max_turns=args.max_turns
         
     with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
-        file.write("Game Options:\n"+str(options)+"\n")
+        file.write("Game Paramaters:\n"+str(options)+"\n")
 
     # create a new game
     game = Game(options=options)
