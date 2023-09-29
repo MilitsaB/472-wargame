@@ -481,9 +481,11 @@ class Game:
                 self.perform_attack(coords)
                 return (True, "Attack initiated")
             if move_type == "repair":
+                self.log_move(move_type,coords)
                 self.perform_repair(coords)
                 return (True, "Repair initiated")
             if move_type == "self-destruct":
+                self.log_move(move_type,coords)
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
 
