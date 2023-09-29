@@ -438,7 +438,11 @@ class Game:
         with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
 
             file.write("\nTurn number: "+str(self.turns_played)+"\n")
-            
+            if self.next_player==Player.Attacker:
+                file.write("Attacker's Turn\n")
+            else:
+                file.write("Defender's Turn\n")
+
             if self.next_player==Player.Attacker and move_type=="valid move":
                 file.write("Attacker moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
             elif self.next_player==Player.Defender and move_type=="valid move":
@@ -732,7 +736,7 @@ def main():
         
     with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
         file.write("Game Paramaters:\n"+str(options)+"\n")
-
+    
     # create a new game
     game = Game(options=options)
 
@@ -749,7 +753,7 @@ def main():
             break
         if game.turns_played == options.max_turns:
             print(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
-            winner=Player.Defender
+            file.write(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.\n")
             exit(1)
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
