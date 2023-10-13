@@ -1,0 +1,5 @@
+
+*.txt
+*.xml
+.idea/472.iml
+.DS_Store
