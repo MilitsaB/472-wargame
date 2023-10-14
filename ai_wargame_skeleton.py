@@ -13,6 +13,7 @@ import requests
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
 
+ID = 0
 
 class UnitType(Enum):
     """Every unit type."""
@@ -261,6 +262,133 @@ class Stats:
 
 
 ##############################################################################################################
+
+class TreeNode:
+    def __init__(self, id, game, e1=None, e2=-1, parent=None, max=False):
+        self.id = id
+        self.game = game
+        self.e1 = e1  # any heuristic for simple minimax, or beta for e2 beta pruning
+        self.e2 = e2  # strong heuristic for e2 beta pruning
+        self.children = []
+        self.parent = parent  # maybe useless
+        self.max = max  # max = asc, min = desc
+
+
+def _sort_nodes(nodes, reverse):
+    return sorted(nodes, key=lambda x: x.e1, reverse=reverse)
+
+##############################################################################################################
+
+class Tree:
+    def __init__(self):
+        self.root = None
+        self.nodes = {}
+
+    def add_node(self, id, game, e1=-1, e2=-1, parent=None):
+        max_value = parent is None or not self.nodes[parent].max #can be removed for time optimization later
+        node = TreeNode(id, game, e1=e1, e2=e2, parent=parent, max=max_value)
+        self.nodes[id] = node
+
+        if parent is None:
+            self.root = node
+        else:
+            parent_node = self.nodes[parent]
+            parent_node.children.append(node)
+
+    def traverse_ordered(self, node=None):
+        if node is None:
+            node = self.root
+
+        children = node.children
+
+        if len(children) != 0:
+            if children[0].max:
+                children = _sort_nodes(children, reverse=False)
+            else:
+                children = _sort_nodes(children, reverse=True)
+
+        for child in children:
+            self.traverse_ordered(child)
+
+        # Update the node children with the sorted values
+        node.children = children
+
+    # Needs review
+    def minimax(self, node=None):
+        if node is None:
+            node = self.root
+
+        if not node.children:  # Leaf node
+            return node.e1
+
+        if node.max:
+            max_value = float("-inf")
+            for child in node.children:
+                child_value = self.minimax(child)
+                max_value = max(max_value, child_value)
+            node.e1 = max_value
+        else:
+            min_value = float("inf")
+            for child in node.children:
+                child_value = self.minimax(child)
+                min_value = min(min_value, child_value)
+            node.e1 = min_value
+
+        return node.e1
+
+    # Needs review
+    def alpha_beta_pruning(self, node=None):
+        if node is None:
+            node = self.root
+
+        return self._alpha_beta_pruning(node, float("-inf"), float("inf"))
+
+    def _alpha_beta_pruning(self, node, alpha, beta):
+        if not node.children:  # Leaf node
+            random_offset = random.randint(1, 3)
+            node.e2 = max(0, node.e1 + random_offset)
+            return node.e2
+
+        if node.max:
+            for child in node.children:
+                alpha = max(alpha, self._alpha_beta_pruning(child, alpha, beta))
+                if beta <= alpha:
+                    break
+            node.e2 = alpha
+            return alpha
+        else:
+            for child in node.children:
+                beta = min(beta, self._alpha_beta_pruning(child, alpha, beta))
+                if beta <= alpha:
+                    break
+            node.e2 = beta
+            return beta
+
+    # only for debugging
+    def print_tree(self, node=None, prefix="", is_last=True):
+        if node is None:
+            node = self.root
+
+        node_type = "(max)" if node.max else "(min)"
+        print(prefix + ("└── " if is_last else "├── ") + str(node.e1) + " " + node_type)
+
+        if node.children:
+            for i, child in enumerate(node.children):
+                self.print_tree(child, prefix + ("    " if is_last else "│   "), i == len(node.children) - 1)
+
+    def print_tree_alphabeta(self, node=None, prefix="", is_last=True):
+        if node is None:
+            node = self.root
+
+        node_type = "(max)" if node.max else "(min)"
+        print(prefix + ("└── " if is_last else "├── ") + str(node.e2) + " " + node_type)
+
+        if node.children:
+            for i, child in enumerate(node.children):
+                self.print_tree_alphabeta(child, prefix + ("    " if is_last else "│   "), i == len(node.children) - 1)
+
+##############################################################################################################
+
 @dataclass(slots=True)
 class Game:
     """Representation of the game state."""
@@ -335,7 +463,7 @@ class Game:
 
     """CODE MODIFIED OR ADDED BY OUR TEAM FOR D1"""
 
-    def is_valid_move(self, coords: CoordPair) -> Tuple[bool, str]: 
+    def is_valid_move(self, coords: CoordPair) -> Tuple[bool, str]:
 
         # if source coordinates are not valid or destination coordinates are not valid, false
         # is_valid_coord checks if coordinate is within board dimensions
@@ -433,7 +561,7 @@ class Game:
         for adjacent_coordinate in coords.src.iter_all8_adjacent():
             if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
-                    
+
     def log_move(self, move_type ,coords:CoordPair):
         with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
 
@@ -447,17 +575,17 @@ class Game:
                 file.write("Attacker moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
             elif self.next_player==Player.Defender and move_type=="valid move":
                 file.write("Defender moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
-                
+
             if self.next_player==Player.Attacker and move_type=="attack":
                 file.write("Attacker attacked "+ str(coords) + "\n")
             elif self.next_player==Player.Defender and move_type=="attack":
                 file.write("Defender attacked "+ str(coords) + "\n")
-                
+
             if self.next_player==Player.Attacker and move_type=="repair":
                 file.write("Attacker repaired "+ str(coords) + "\n")
             elif self.next_player==Player.Defender and move_type=="repair":
                 file.write("Defender repaired "+ str(coords) + "\n")
-                
+
             if self.next_player==Player.Attacker and move_type=="self-destruct":
                 file.write("Attacker self-destruct\n")
             elif self.next_player==Player.Defender and move_type=="self-destruct":
@@ -641,6 +769,103 @@ class Game:
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
 
+    def initialize_game_tree(self):
+        global ID
+        tree.add_node(ID, game=self, parent=None) # starting by a max
+        ID += 1
+
+    def generate_game_states(self, player: Player, leaf, parent=None):
+        for y in range(self.options.dim):
+            for x in range(self.options.dim):
+                unit = self.get(Coord(x, y))
+                coord = Coord(x, y)
+                if unit and unit.player == player:
+                    self.generate_unit_moves(coord, leaf, parent)
+
+    def generate_unit_moves(self, coord: Coord, leaf, parent=None):
+        """Generate possible moves for the given unit at the given coordinate."""
+        x, y = coord.row, coord.col
+        global ID
+
+        directions = [(0, -1), (-1, 0), (1, 0), (0, 1)]  # Up, Left, Right, Down
+
+        for dx, dy in directions:
+            new_x, new_y = x + dx, y + dy
+            new_coord = Coord(new_x, new_y)
+            next_move = CoordPair(coord, new_coord)
+            result, move = tree.nodes[parent].game.is_valid_move(next_move)
+            if result:
+                new_board = tree.nodes[parent].game.clone()
+                new_board.perform_move(next_move)
+                e1 = None
+
+                # only calculates heuristic on leaf
+                if leaf:
+                    e1 = new_board.heuristic_0()
+
+                tree.add_node(ID, game=new_board, e1=e1, parent=parent)
+                ID += 1
+
+    def generate_game_tree_recursive(self, depth, player: Player, leaf, parent_id=None):
+        if parent_id is None:
+            self.initialize_game_tree()
+            self.generate_game_states(player, leaf, parent=0)
+            parent_id = 0
+            depth -= 1
+
+        else:
+            self.generate_game_states(player, leaf, parent=parent_id)
+
+        if depth == 0:  # Base case: Stop recursion when depth reaches 0
+            return
+
+        if depth == 1:  # Base case: Stop recursion when depth reaches 0
+            leaf = True
+
+        for child in tree.nodes[parent_id].children:
+            if player == player.Attacker:
+                player = player.Defender
+            else:
+                player = player.Attacker
+            self.generate_game_tree_recursive(depth - 1, player, leaf, parent_id=child.id)
+
+    def heuristic_0(self):
+        attacker_score = 0
+        defender_score = 0
+
+        for coord, unit in self.player_units(Player.Attacker):
+            if unit.type == UnitType.Virus:
+                attacker_score += 3
+            elif unit.type == UnitType.Tech:
+                attacker_score += 3
+            elif unit.type == UnitType.Firewall:
+                attacker_score += 3
+            elif unit.type == UnitType.Program:
+                attacker_score += 3
+            elif unit.type == UnitType.AI:
+                attacker_score += 9999
+
+        for coord, unit in self.player_units(Player.Defender):
+            if unit.type == UnitType.Virus:
+                defender_score += 3
+            elif unit.type == UnitType.Tech:
+                defender_score += 3
+            elif unit.type == UnitType.Firewall:
+                defender_score += 3
+            elif unit.type == UnitType.Program:
+                defender_score += 3
+            elif unit.type == UnitType.AI:
+                defender_score += 9999
+
+        ## for testing (otherwise gives 0 always for now)
+        random_offset = random.randint(1, 10)
+        return attacker_score - defender_score + random_offset
+    #
+    # def heuristic_1(self):
+    #     #e1
+    #
+    # def heuristic_2(self):
+    #     #e2
 
     """IGNORE THIS"""
     def post_move_to_broker(self, move: CoordPair):
@@ -694,6 +919,8 @@ class Game:
 
 
 ##############################################################################################################
+ # create a new global tree
+tree = Tree()
 
 def main():
     # parse command line arguments
@@ -707,8 +934,8 @@ def main():
     parser.add_argument('--max_turns', type=int, help='max number of turns the game will go on for')
 
     args = parser.parse_args()
-            
-    
+
+
 
 
     # parse the game type
@@ -733,12 +960,17 @@ def main():
         options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns=args.max_turns
-        
+
     with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
         file.write("Game Paramaters:\n"+str(options)+"\n")
-    
+
     # create a new game
     game = Game(options=options)
+    game.generate_game_tree_recursive(2, Player.Attacker, leaf=False)
+    tree.print_tree()
+
+    # tree.minimax()
+    # tree.print_tree()
 
     # the main game loop
     while True:
