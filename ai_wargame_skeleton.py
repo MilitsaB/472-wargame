@@ -273,7 +273,7 @@ class TreeNode:
         self.e1 = e1  # any heuristic for simple minimax, or beta for e2 beta pruning
         self.e2 = e2  # strong heuristic for e2 beta pruning
         self.children: List[TreeNode] = []
-        self.parent = parent  # maybe useless
+        self.parent = parent  #TODO: remove parent in future
         self.max = max  # max = asc, min = desc
 
 
@@ -317,28 +317,34 @@ class Tree:
         # Update the node children with the sorted values
         node.children = children
 
-    # Needs review
+    # TODO: add comments explaining each step
     def minimax(self, node=None):
         if node is None:
             node = self.root
 
         if not node.children:  # Leaf node
-            return node.e1
+            return node.e1, None
 
         if node.max:
             max_value = float("-inf")
+            max_child = None
             for child in node.children:
-                child_value = self.minimax(child)
-                max_value = max(max_value, child_value)
+                child_value, _ = self.minimax(child)
+                if child_value > max_value:
+                    max_value = child_value
+                    max_child = child
             node.e1 = max_value
+            return max_value, max_child
         else:
             min_value = float("inf")
+            min_child = None
             for child in node.children:
-                child_value = self.minimax(child)
-                min_value = min(min_value, child_value)
+                child_value, _ = self.minimax(child)
+                if child_value < min_value:
+                    min_value = child_value
+                    min_child = child
             node.e1 = min_value
-
-        return node.e1
+            return min_value, min_child
 
     def alpha_beta_pruning(self, node=None):
         if node is None:
@@ -357,25 +363,25 @@ class Tree:
         if node.max:
             best_node = None  # Node that results in the best alpha value
             for child in node.children:
-                new_alpha, new_node = self._alpha_beta_pruning(child, alpha, beta)
+                new_alpha, _ = self._alpha_beta_pruning(child, alpha, beta)
                 if new_alpha > alpha:
                     alpha = new_alpha
-                    best_node = child  # Store the child node instead of the new_node
+                    best_node = child  # Store the child node to keep track
                 if beta <= alpha:
                     break
             node.e2 = alpha
-            return alpha, best_node  # Return the child node along with the value
+            return alpha, best_node
         else:
             best_node = None  # Node that results in the best beta value
             for child in node.children:
-                new_beta, new_node = self._alpha_beta_pruning(child, alpha, beta)
+                new_beta, _ = self._alpha_beta_pruning(child, alpha, beta)
                 if new_beta < beta:
                     beta = new_beta
-                    best_node = child  # Store the child node instead of the new_node
+                    best_node = child  # Store the child node to keep track
                 if beta <= alpha:
                     break
             node.e2 = beta
-            return beta, best_node  # Return the child node along with the value
+            return beta, best_node
 
     # only for debugging
     def print_tree(self, node=None, prefix="", is_last=True):
@@ -781,14 +787,19 @@ class Game:
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
 
-        tree.minimax(current_node)
+        result, node = tree.minimax(current_node)
 
-        # if self.options.alpha_beta:
-        tree.traverse_ordered(current_node)
-        result, node = tree.alpha_beta_pruning(current_node)
-        score = node.e2
-        move = node.move
-        current_node_id = node.id
+        if not self.options.alpha_beta:
+            score = node.e1
+            move = node.move
+            current_node_id = node.id
+
+        if self.options.alpha_beta:
+            tree.traverse_ordered(current_node)
+            result, node = tree.alpha_beta_pruning(current_node)
+            score = node.e2
+            move = node.move
+            current_node_id = node.id
 
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
@@ -993,15 +1004,8 @@ def main():
         options.broker = args.broker
     if args.max_turns is not None:
         options.max_turns = args.max_turns
-
-    # check the value of args.alpha_beta
     if args.alpha_beta is not None:
-        if args.alpha_beta:
-            options.alpha_beta = True
-            options.use_alpha_beta = True
-        else:
-            options.alpha_beta = False
-            options.use_alpha_beta = False
+        options.alpha_beta = args.alpha_beta
 
     with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
             options.max_turns) + ">.txt", "w", encoding="utf-8") as file:
