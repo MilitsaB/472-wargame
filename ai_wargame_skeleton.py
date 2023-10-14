@@ -285,7 +285,7 @@ class Tree:
         self.nodes = {}
 
     def add_node(self, id, game, e1=-1, e2=-1, parent=None):
-        max_value = parent is None or not self.nodes[parent].max #can be removed for time optimization later
+        max_value = parent is None or not self.nodes[parent].max # can be removed for time optimization later
         node = TreeNode(id, game, e1=e1, e2=e2, parent=parent, max=max_value)
         self.nodes[id] = node
 
@@ -370,7 +370,7 @@ class Tree:
             node = self.root
 
         node_type = "(max)" if node.max else "(min)"
-        print(prefix + ("└── " if is_last else "├── ") + str(node.e1) + " " + node_type)
+        print(prefix + ("└── " if is_last else "├── ") + str(node.id) + " " + node_type)
 
         if node.children:
             for i, child in enumerate(node.children):
@@ -475,12 +475,12 @@ class Game:
 
         # if src is empty, return false
         if src is None:
-            print("Sorry, source is empty, no player found at location.")
+            #print("Sorry, source is empty, no player found at location.")
             return False, "Invalid move"
 
         # if player is not the player that should be playing, false
         if src.player != self.next_player:
-            print("Sorry, this is " + self.next_player.name + "'s turn.")
+            #print("Sorry, this is " + self.next_player.name + "'s turn.")
             return False, "Invalid move"
 
         # if src and dst is the same, player is self-destructing, return true and indicate that it is a self-destruct
@@ -489,7 +489,7 @@ class Game:
 
         # if dst is not adjacent, return false
         if coords.dst not in coords.src.iter_adjacent():
-            print("Sorry, this destination is not adjacent to the source.")
+            #print("Sorry, this destination is not adjacent to the source.")
             return False, "Invalid move"
 
         # if src is AI and player is repairing his own Tech or Virus with health level less than 9,
@@ -498,7 +498,7 @@ class Game:
             if (dst.type == UnitType.Tech or dst.type == UnitType.Virus) and dst.health < 9:
                 return True, "repair"
             else:
-                print("Sorry, AI cannot repair player " + dst.player.name + ".")
+                #print("Sorry, AI cannot repair player " + dst.player.name + ".")
                 return False, "Invalid move"
 
         # if src is AI, Firewall or Program and is trying to move while engaged in combat (has an opponent adjacent), return false
@@ -510,7 +510,7 @@ class Game:
             else:
                 for adjacent_coordinate in coords.src.iter_adjacent():
                     if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate) and self.get(adjacent_coordinate).player != src.player:
-                        print("Sorry, this player is engaged in combat.")
+                        #print("Sorry, this player is engaged in combat.")
                         return False, "Invalid move"
 
         # if src is Tech or Virus, player can move regardless of being in combat
@@ -531,14 +531,14 @@ class Game:
         if src.player == Player.Attacker:
             if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
                 if coords.src.row < coords.dst.row or coords.src.col < coords.dst.col:
-                    print("An attacker piece of type " + src.type.name + " can only move up or left")
+                    #print("An attacker piece of type " + src.type.name + " can only move up or left")
                     return False, "Invalid move"
 
         # if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
         if src.player == Player.Defender:
             if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
                 if coords.src.row > coords.dst.row or coords.src.col > coords.dst.col:
-                    print("A defender piece of type: " + src.type.name + " can only move down or right")
+                    #print("A defender piece of type: " + src.type.name + " can only move down or right")
                     return False, "Invalid move"
 
         return dst is None, "valid move"
@@ -774,12 +774,12 @@ class Game:
         tree.add_node(ID, game=self, parent=None) # starting by a max
         ID += 1
 
-    def generate_game_states(self, player: Player, leaf, parent=None):
+    def generate_game_states(self, leaf, parent=None):
         for y in range(self.options.dim):
             for x in range(self.options.dim):
                 unit = self.get(Coord(x, y))
                 coord = Coord(x, y)
-                if unit and unit.player == player:
+                if unit and unit.player == self.next_player:
                     self.generate_unit_moves(coord, leaf, parent)
 
     def generate_unit_moves(self, coord: Coord, leaf, parent=None):
@@ -797,24 +797,26 @@ class Game:
             if result:
                 new_board = tree.nodes[parent].game.clone()
                 new_board.perform_move(next_move)
+                new_board.next_turn()
+                print(new_board)
                 e1 = None
 
-                # only calculates heuristic on leaf
+                # only calculates heuristic on leafs
                 if leaf:
                     e1 = new_board.heuristic_0()
 
                 tree.add_node(ID, game=new_board, e1=e1, parent=parent)
                 ID += 1
 
-    def generate_game_tree_recursive(self, depth, player: Player, leaf, parent_id=None):
+    def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
         if parent_id is None:
             self.initialize_game_tree()
-            self.generate_game_states(player, leaf, parent=0)
             parent_id = 0
+            self.generate_game_states( leaf, parent=parent_id)
             depth -= 1
 
         else:
-            self.generate_game_states(player, leaf, parent=parent_id)
+            tree.nodes[parent_id].game.generate_game_states(leaf, parent=parent_id)
 
         if depth == 0:  # Base case: Stop recursion when depth reaches 0
             return
@@ -822,12 +824,9 @@ class Game:
         if depth == 1:  # Base case: Stop recursion when depth reaches 0
             leaf = True
 
+
         for child in tree.nodes[parent_id].children:
-            if player == player.Attacker:
-                player = player.Defender
-            else:
-                player = player.Attacker
-            self.generate_game_tree_recursive(depth - 1, player, leaf, parent_id=child.id)
+            tree.nodes[parent_id].game.generate_game_tree_recursive(depth - 1, leaf, parent_id=child.id)
 
     def heuristic_0(self):
         attacker_score = 0
@@ -966,7 +965,7 @@ def main():
 
     # create a new game
     game = Game(options=options)
-    game.generate_game_tree_recursive(2, Player.Attacker, leaf=False)
+    game.generate_game_tree_recursive(2, leaf=False)
     tree.print_tree()
 
     # tree.minimax()
