@@ -15,6 +15,7 @@ MIN_HEURISTIC_SCORE = -2000000000
 
 ID = 0
 
+
 class UnitType(Enum):
     """Every unit type."""
     AI = 0
@@ -246,9 +247,9 @@ class Options:
     min_depth: int | None = 2
     max_time: float | None = 5.0
     game_type: GameType = GameType.AttackerVsDefender
-    alpha_beta: bool = False #only for D1
+    alpha_beta: bool = False  # only for D1
     max_turns: int | None = 100
-    randomize_moves: bool = False #only for D1
+    randomize_moves: bool = False  # only for D1
     broker: str | None = None
 
 
@@ -264,9 +265,11 @@ class Stats:
 ##############################################################################################################
 
 class TreeNode:
-    def __init__(self, id: int, game: Game, e1=None, e2=None, parent: TreeNode=None, max=False):
+    def __init__(self, id: int, game: Game, move: CoordPair, e1: int = None, e2: int = None, parent: TreeNode = None,
+                 max=False):
         self.id = id
         self.game = game
+        self.move = move
         self.e1 = e1  # any heuristic for simple minimax, or beta for e2 beta pruning
         self.e2 = e2  # strong heuristic for e2 beta pruning
         self.children: List[TreeNode] = []
@@ -277,6 +280,7 @@ class TreeNode:
 def _sort_nodes(nodes, reverse):
     return sorted(nodes, key=lambda x: x.e1, reverse=reverse)
 
+
 ##############################################################################################################
 
 class Tree:
@@ -284,9 +288,9 @@ class Tree:
         self.root = None
         self.nodes = {}
 
-    def add_node(self, id, game, e1=None, e2=None, parent=None):
-        max_value = parent is None or not self.nodes[parent].max # can be removed for time optimization later
-        node = TreeNode(id, game, e1=e1, e2=e2, parent=parent, max=max_value)
+    def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None, parent: TreeNode = None):
+        max_value = parent is None or not self.nodes[parent].max  # can be removed for time optimization later
+        node = TreeNode(id, game, move, e1=e1, e2=e2, parent=parent, max=max_value)
         self.nodes[id] = node
 
         if parent is None:
@@ -390,11 +394,12 @@ class Tree:
             node = self.root
 
         node_type = "(max)" if node.max else "(min)"
-        print(prefix + ("└── " if is_last else "├── ") + str(node.e2) + " " + str(node.id) + " " +node_type)
+        print(prefix + ("└── " if is_last else "├── ") + str(node.e2) + " " + str(node.id) + " " + node_type)
 
         if node.children:
             for i, child in enumerate(node.children):
                 self.print_tree_alphabeta(child, prefix + ("    " if is_last else "│   "), i == len(node.children) - 1)
+
 
 ##############################################################################################################
 
@@ -484,12 +489,12 @@ class Game:
 
         # if src is empty, return false
         if src is None:
-            #print("Sorry, source is empty, no player found at location.")
+            # print("Sorry, source is empty, no player found at location.")
             return False, "Invalid move"
 
         # if player is not the player that should be playing, false
         if src.player != self.next_player:
-            #print("Sorry, this is " + self.next_player.name + "'s turn.")
+            # print("Sorry, this is " + self.next_player.name + "'s turn.")
             return False, "Invalid move"
 
         # if src and dst is the same, player is self-destructing, return true and indicate that it is a self-destruct
@@ -498,7 +503,7 @@ class Game:
 
         # if dst is not adjacent, return false
         if coords.dst not in coords.src.iter_adjacent():
-            #print("Sorry, this destination is not adjacent to the source.")
+            # print("Sorry, this destination is not adjacent to the source.")
             return False, "Invalid move"
 
         # if src is AI and player is repairing his own Tech or Virus with health level less than 9,
@@ -507,7 +512,7 @@ class Game:
             if (dst.type == UnitType.Tech or dst.type == UnitType.Virus) and dst.health < 9:
                 return True, "repair"
             else:
-                #print("Sorry, AI cannot repair player " + dst.player.name + ".")
+                # print("Sorry, AI cannot repair player " + dst.player.name + ".")
                 return False, "Invalid move"
 
         # if src is AI, Firewall or Program and is trying to move while engaged in combat (has an opponent adjacent), return false
@@ -518,8 +523,9 @@ class Game:
             # loop over the return of the iter_adjacent to see if player is engaged in combat
             else:
                 for adjacent_coordinate in coords.src.iter_adjacent():
-                    if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate) and self.get(adjacent_coordinate).player != src.player:
-                        #print("Sorry, this player is engaged in combat.")
+                    if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate) and self.get(
+                            adjacent_coordinate).player != src.player:
+                        # print("Sorry, this player is engaged in combat.")
                         return False, "Invalid move"
 
         # if src is Tech or Virus, player can move regardless of being in combat
@@ -531,7 +537,8 @@ class Game:
 
                 # if src is Tech, player can repair his own team if health is less than 9, otherwise return false
                 elif src.type == UnitType.Tech and dst.player == src.player:
-                    if (dst.type == UnitType.AI or dst.type == UnitType.Firewall or dst.type == UnitType.Program) and dst.health < 9:
+                    if (
+                            dst.type == UnitType.AI or dst.type == UnitType.Firewall or dst.type == UnitType.Program) and dst.health < 9:
                         return True, "repair"
                 else:
                     return False, "Invalid move"
@@ -540,14 +547,14 @@ class Game:
         if src.player == Player.Attacker:
             if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
                 if coords.src.row < coords.dst.row or coords.src.col < coords.dst.col:
-                    #print("An attacker piece of type " + src.type.name + " can only move up or left")
+                    # print("An attacker piece of type " + src.type.name + " can only move up or left")
                     return False, "Invalid move"
 
         # if unit is a defender, AI, Firewall and Program can only move down or right; its Tech and Virus can move all directions
         if src.player == Player.Defender:
             if src.type == UnitType.AI or src.type == UnitType.Firewall or src.type == UnitType.Program:
                 if coords.src.row > coords.dst.row or coords.src.col > coords.dst.col:
-                    #print("A defender piece of type: " + src.type.name + " can only move down or right")
+                    # print("A defender piece of type: " + src.type.name + " can only move down or right")
                     return False, "Invalid move"
 
         return dst is None, "valid move"
@@ -571,33 +578,34 @@ class Game:
             if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate):
                 self.mod_health(adjacent_coordinate, -2)
 
-    def log_move(self, move_type ,coords:CoordPair):
-        with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
+    def log_move(self, move_type, coords: CoordPair):
+        with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
 
-            file.write("\nTurn number: "+str(self.turns_played)+"\n")
-            if self.next_player==Player.Attacker:
+            file.write("\nTurn number: " + str(self.turns_played) + "\n")
+            if self.next_player == Player.Attacker:
                 file.write("Attacker's Turn\n")
             else:
                 file.write("Defender's Turn\n")
 
-            if self.next_player==Player.Attacker and move_type=="valid move":
-                file.write("Attacker moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
-            elif self.next_player==Player.Defender and move_type=="valid move":
-                file.write("Defender moved from "+ str(coords.src)+" to "+str(coords.dst)+"\n")
+            if self.next_player == Player.Attacker and move_type == "valid move":
+                file.write("Attacker moved from " + str(coords.src) + " to " + str(coords.dst) + "\n")
+            elif self.next_player == Player.Defender and move_type == "valid move":
+                file.write("Defender moved from " + str(coords.src) + " to " + str(coords.dst) + "\n")
 
-            if self.next_player==Player.Attacker and move_type=="attack":
-                file.write("Attacker attacked "+ str(coords) + "\n")
-            elif self.next_player==Player.Defender and move_type=="attack":
-                file.write("Defender attacked "+ str(coords) + "\n")
+            if self.next_player == Player.Attacker and move_type == "attack":
+                file.write("Attacker attacked " + str(coords) + "\n")
+            elif self.next_player == Player.Defender and move_type == "attack":
+                file.write("Defender attacked " + str(coords) + "\n")
 
-            if self.next_player==Player.Attacker and move_type=="repair":
-                file.write("Attacker repaired "+ str(coords) + "\n")
-            elif self.next_player==Player.Defender and move_type=="repair":
-                file.write("Defender repaired "+ str(coords) + "\n")
+            if self.next_player == Player.Attacker and move_type == "repair":
+                file.write("Attacker repaired " + str(coords) + "\n")
+            elif self.next_player == Player.Defender and move_type == "repair":
+                file.write("Defender repaired " + str(coords) + "\n")
 
-            if self.next_player==Player.Attacker and move_type=="self-destruct":
+            if self.next_player == Player.Attacker and move_type == "self-destruct":
                 file.write("Attacker self-destruct\n")
-            elif self.next_player==Player.Defender and move_type=="self-destruct":
+            elif self.next_player == Player.Defender and move_type == "self-destruct":
                 file.write("Defender self-destruct\n")
 
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
@@ -605,20 +613,20 @@ class Game:
         is_valid, move_type = self.is_valid_move(coords)
         if is_valid:
             if move_type == "valid move":
-                self.log_move(move_type,coords)
+                self.log_move(move_type, coords)
                 self.set(coords.dst, self.get(coords.src))
                 self.set(coords.src, None)
                 return (True, "Move initiated")
             if move_type == "attack":
-                self.log_move(move_type,coords)
+                self.log_move(move_type, coords)
                 self.perform_attack(coords)
                 return (True, "Attack initiated")
             if move_type == "repair":
-                self.log_move(move_type,coords)
+                self.log_move(move_type, coords)
                 self.perform_repair(coords)
                 return (True, "Repair initiated")
             if move_type == "self-destruct":
-                self.log_move(move_type,coords)
+                self.log_move(move_type, coords)
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
 
@@ -654,8 +662,9 @@ class Game:
                 else:
                     output += f"{str(unit):^3} "
             output += "\n"
-        with open("gameTrace-<"+str(self.options.alpha_beta)+">-<"+str(self.options.max_time)+">-<"+str(self.options.max_turns)+">.txt", "a",encoding="utf-8") as file:
-            file.write("Board:\n"+output)
+        with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+            file.write("Board:\n" + output)
 
         return output
 
@@ -681,6 +690,7 @@ class Game:
                 print('Invalid coordinates! Try again.')
 
     def human_turn(self):
+        global current_node_id
         """Human player plays a move (or get via broker)."""
         if self.options.broker is not None:
             print("Getting next move with auto-retry from game broker...")
@@ -702,6 +712,14 @@ class Game:
                     print(f"Player {self.next_player.name}: ", end='')
                     print(result)
                     self.next_turn()
+
+                    if (self.options.game_type == GameType.AttackerVsComp and current_node_id is not 0) or self.options.game_type == GameType.CompVsDefender:
+                        for child in tree.nodes[current_node_id].children:
+                            if child.game == self:
+                                child.game.next_turn()
+                                current_node_id = child.id
+                                break
+
                     break
                 else:
                     print("The move is not valid! Try again.")
@@ -762,8 +780,21 @@ class Game:
 
     def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
+        global current_node_id
         start_time = datetime.now()
-        (score, move, avg_depth) = self.random_move()
+
+        avg_depth = 2
+        self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
+        current_node = tree.nodes[current_node_id]
+
+        tree.minimax(current_node)
+
+        # if self.options.alpha_beta:
+        tree.traverse_ordered(current_node)
+        result, node = tree.alpha_beta_pruning(current_node)
+        score = node.e2
+        move = node.move
+
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
@@ -780,7 +811,7 @@ class Game:
 
     def initialize_game_tree(self):
         global ID
-        tree.add_node(ID, game=self, parent=None) # starting by a max
+        tree.add_node(ID, game=self, parent=None)  # starting by a max
         ID += 1
 
     def generate_game_states(self, leaf, parent=None):
@@ -813,17 +844,16 @@ class Game:
                 if leaf:
                     e1 = new_board.heuristic_0()
 
-                tree.add_node(ID, game=new_board, e1=e1, parent=parent)
+                tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
 
     def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
-        if parent_id is None:
+        if parent_id is None or parent_id == 0 :
             self.initialize_game_tree()
             parent_id = 0
-            self.generate_game_states(leaf, parent=parent_id)
             depth -= 1
 
-        else:
+        if not tree.nodes[parent_id].children:  # Check if the node has children
             tree.nodes[parent_id].game.generate_game_states(leaf, parent=parent_id)
 
         if depth == 0:  # Base case: Stop recursion when depth reaches 0
@@ -831,7 +861,6 @@ class Game:
 
         if depth == 1:  # Base case: Stop recursion when depth reaches 0
             leaf = True
-
 
         for child in tree.nodes[parent_id].children:
             tree.nodes[parent_id].game.generate_game_tree_recursive(depth - 1, leaf, parent_id=child.id)
@@ -867,6 +896,7 @@ class Game:
         ## for testing (otherwise gives 0 always for now)
         random_offset = random.randint(1, 10)
         return attacker_score - defender_score + random_offset
+
     #
     # def heuristic_1(self):
     #     #e1
@@ -875,6 +905,7 @@ class Game:
     #     #e2
 
     """IGNORE THIS"""
+
     def post_move_to_broker(self, move: CoordPair):
         """Send a move to the game broker."""
         if self.options.broker is None:
@@ -926,8 +957,10 @@ class Game:
 
 
 ##############################################################################################################
- # create a new global tree
+# create a new global tree
 tree = Tree()
+current_node_id = 0
+
 
 def main():
     # parse command line arguments
@@ -939,11 +972,9 @@ def main():
     parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     parser.add_argument('--max_turns', type=int, help='max number of turns the game will go on for')
+    parser.add_argument('--alpha_beta', type=bool, help='force the use of alpha-beta pruning')
 
     args = parser.parse_args()
-
-
-
 
     # parse the game type
     if args.game_type == "attacker":
@@ -968,35 +999,21 @@ def main():
     if args.max_turns is not None:
         options.max_turns = args.max_turns
 
-    with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
-        file.write("Game Paramaters:\n"+str(options)+"\n")
+    # check the value of args.alpha_beta
+    if args.alpha_beta is not None:
+        if args.alpha_beta:
+            options.alpha_beta = True
+            options.use_alpha_beta = True
+        else:
+            options.alpha_beta = False
+            options.use_alpha_beta = False
+
+    with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
+            options.max_turns) + ">.txt", "w", encoding="utf-8") as file:
+        file.write("Game Paramaters:\n" + str(options) + "\n")
 
     # create a new game
     game = Game(options=options)
-    game.generate_game_tree_recursive(2, leaf=False)
-
-
-    tree.minimax()
-
-
-    tree.traverse_ordered()
-
-
-    result, node = tree.alpha_beta_pruning()
-    tree.print_tree()
-
-    node.children = []
-
-    print(node.children)
-
-    node.game.generate_game_tree_recursive(2, leaf=False, parent_id=node.id)
-    tree.print_tree()
-
-
-
-
-
-
 
     # the main game loop
     while True:
@@ -1004,14 +1021,17 @@ def main():
         print(game)
         winner = game.has_winner()
         if winner is not None:
-            with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "a",encoding="utf-8") as file:
+            with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
+                    options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
                 file.write(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.\n")
 
             print(f"{winner.name} wins! {winner.name} won in {game.turns_played} moves.")
             break
         if game.turns_played == options.max_turns:
-            print(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
-            file.write(f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.\n")
+            print(
+                f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.")
+            file.write(
+                f"Maximum of moves reached. {Player.Defender.name} wins! {Player.Defender.name} won in {game.turns_played} moves.\n")
             exit(1)
         if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
