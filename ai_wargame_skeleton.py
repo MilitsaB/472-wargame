@@ -247,7 +247,7 @@ class Options:
     min_depth: int | None = 2
     max_time: float | None = 5.0
     game_type: GameType = GameType.AttackerVsDefender
-    alpha_beta: bool = False  # only for D1
+    alpha_beta: bool = True
     max_turns: int | None = 100
     randomize_moves: bool = False  # only for D1
     broker: str | None = None
@@ -265,16 +265,14 @@ class Stats:
 ##############################################################################################################
 
 class TreeNode:
-    def __init__(self, id: int, game: Game, move: CoordPair, e1: int = None, e2: int = None, parent: TreeNode = None,
-                 max=False):
+    def __init__(self, id: int, game: Game, move: CoordPair, e1: int = None, e2: int = None, max=False):
         self.id = id
         self.game = game
         self.move = move
         self.e1 = e1  # any heuristic for simple minimax, or beta for e2 beta pruning
         self.e2 = e2  # strong heuristic for e2 beta pruning
         self.children: List[TreeNode] = []
-        self.parent = parent  #TODO: remove parent in future
-        self.max = max  # max = asc, min = desc
+        self.max = max  # max = asc order, min = desc order
 
 
 def _sort_nodes(nodes, reverse):
@@ -289,8 +287,8 @@ class Tree:
         self.nodes = {}
 
     def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None, parent: TreeNode = None):
-        max_value = parent is None or not self.nodes[parent].max  # can be removed for time optimization later
-        node = TreeNode(id, game, move, e1=e1, e2=e2, parent=parent, max=max_value)
+        max_value = parent is None or not self.nodes[parent].max  # sets if its maximizing or minimizing
+        node = TreeNode(id, game, move, e1=e1, e2=e2, max=max_value)
         self.nodes[id] = node
 
         if parent is None:
@@ -299,6 +297,7 @@ class Tree:
             parent_node = self.nodes[parent]
             parent_node.children.append(node)
 
+    # Sort level by level from the root to the leafs
     def traverse_ordered(self, node=None):
         if node is None:
             node = self.root
@@ -317,24 +316,26 @@ class Tree:
         # Update the node children with the sorted values
         node.children = children
 
-    # TODO: add comments explaining each step
     def minimax(self, node=None):
+        # If not given, starting node is root
         if node is None:
             node = self.root
 
-        if not node.children:  # Leaf node
+        # Check if the node is a leaf node (no need to do any minmax on leaf)
+        if not node.children:
             return node.e1, None
 
         if node.max:
             max_value = float("-inf")
             max_child = None
             for child in node.children:
-                child_value, _ = self.minimax(child)
-                if child_value > max_value:
+                child_value, _ = self.minimax(child)  # Recursively call minimax
+                if child_value > max_value:  # Update the maximum value and its corresponding child
                     max_value = child_value
                     max_child = child
             node.e1 = max_value
             return max_value, max_child
+
         else:
             min_value = float("inf")
             min_child = None
@@ -347,28 +348,30 @@ class Tree:
             return min_value, min_child
 
     def alpha_beta_pruning(self, node=None):
+        # If not given, starting node is root
         if node is None:
             node = self.root
 
+        # Private helper method with initial alpha and beta values
         e2, best_node = self._alpha_beta_pruning(node, float("-inf"), float("inf"))
         return e2, best_node
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
-            # JUST FOR TESTING
+            # JUST FOR TESTING, will be replaced heuristic_2()
             random_offset = random.randint(1, 3)
             node.e2 = max(0, node.e1 + random_offset)
             return node.e2, node
 
         if node.max:
-            best_node = None  # Node that results in the best alpha value
+            best_node = None
             for child in node.children:
-                new_alpha, _ = self._alpha_beta_pruning(child, alpha, beta)
-                if new_alpha > alpha:
+                new_alpha, _ = self._alpha_beta_pruning(child, alpha, beta)  # Recursive call
+                if new_alpha > alpha:  # Update the alpha value and its corresponding child
                     alpha = new_alpha
-                    best_node = child  # Store the child node to keep track
+                    best_node = child
                 if beta <= alpha:
-                    break
+                    break  # Pruning here
             node.e2 = alpha
             return alpha, best_node
         else:
@@ -377,11 +380,13 @@ class Tree:
                 new_beta, _ = self._alpha_beta_pruning(child, alpha, beta)
                 if new_beta < beta:
                     beta = new_beta
-                    best_node = child  # Store the child node to keep track
+                    best_node = child
                 if beta <= alpha:
-                    break
+                    break  # Pruning here
             node.e2 = beta
             return beta, best_node
+
+
 
     # only for debugging
     def print_tree(self, node=None, prefix="", is_last=True):
@@ -714,6 +719,7 @@ class Game:
                     print(result)
                     self.next_turn()
 
+                    # If human is playing against AI, update the current_node of tree
                     if (self.options.game_type == GameType.AttackerVsComp and current_node_id > 0) or self.options.game_type == GameType.CompVsDefender:
                         for child in tree.nodes[current_node_id].children:
                             if child.game == self:
@@ -783,20 +789,24 @@ class Game:
         global current_node_id
         start_time = datetime.now()
 
+        # TODO: based on max_time given by user, set depth of recursive calls according to that.
+        #  Can set different depth depending on where we are in the game, that's why its avg
+        # Question: do we need a depth attribute to a tree node?
         avg_depth = 2
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
 
         result, node = tree.minimax(current_node)
 
+        # if we are only doing minimax
         if not self.options.alpha_beta:
             score = node.e1
             move = node.move
             current_node_id = node.id
 
         if self.options.alpha_beta:
-            tree.traverse_ordered(current_node)
-            result, node = tree.alpha_beta_pruning(current_node)
+            tree.traverse_ordered(current_node) # optimal ordering
+            result, node = tree.alpha_beta_pruning(current_node) # alpha beta pruning
             score = node.e2
             move = node.move
             current_node_id = node.id
@@ -815,11 +825,13 @@ class Game:
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
 
+    """Initializes the game tree by adding the root node"""
     def initialize_game_tree(self):
         global ID
         tree.add_node(ID, game=self, parent=None)  # starting by a max
         ID += 1
 
+    """Iterates over the board's dimensions until unit of the player is found"""
     def generate_game_states(self, leaf, parent=None):
         for y in range(self.options.dim):
             for x in range(self.options.dim):
@@ -828,49 +840,56 @@ class Game:
                 if unit and unit.player == self.next_player:
                     self.generate_unit_moves(coord, leaf, parent)
 
+    """Generate possible moves for the given unit at the given coordinate"""
     def generate_unit_moves(self, coord: Coord, leaf, parent=None):
-        """Generate possible moves for the given unit at the given coordinate."""
         x, y = coord.row, coord.col
         global ID
 
-        directions = [(0, -1), (-1, 0), (1, 0), (0, 1)]  # Up, Left, Right, Down
+        directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
         for dx, dy in directions:
             new_x, new_y = x + dx, y + dy
             new_coord = Coord(new_x, new_y)
             next_move = CoordPair(coord, new_coord)
-            result, move, error = tree.nodes[parent].game.is_valid_move(next_move)
+            result, _, _ = tree.nodes[parent].game.is_valid_move(next_move)
+
+            # if move is valid, perform move
             if result:
                 new_board = tree.nodes[parent].game.clone()
                 new_board.perform_move(next_move)
                 new_board.next_turn()
                 e1 = None
-
                 # only calculates heuristic on leafs
                 if leaf:
+                    """ Add heuristic calculation !!! """
                     e1 = new_board.heuristic_0()
 
+                # adds new game state as a node in tree
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
 
+    """ Generates tree of moves for each round """
     def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
-        if parent_id is None or parent_id == 0 :
+        if parent_id is None or parent_id == 0:
             self.initialize_game_tree()
             parent_id = 0
             depth -= 1
 
-        if not tree.nodes[parent_id].children:  # Check if the node has children
+        # Only generate game states on leaf
+        if not tree.nodes[parent_id].children:
             tree.nodes[parent_id].game.generate_game_states(leaf, parent=parent_id)
 
         if depth == 0:  # Base case: Stop recursion when depth reaches 0
             return
 
-        if depth == 1:  # Base case: Stop recursion when depth reaches 0
+        if depth == 1:
             leaf = True
 
+        # recursive call to generate the game tree for each child node
         for child in tree.nodes[parent_id].children:
             tree.nodes[parent_id].game.generate_game_tree_recursive(depth - 1, leaf, parent_id=child.id)
 
+    """ e0 given by instructions """
     def heuristic_0(self):
         attacker_score = 0
         defender_score = 0
@@ -899,7 +918,7 @@ class Game:
             elif unit.type == UnitType.AI:
                 defender_score += 9999
 
-        ## for testing (otherwise gives 0 always for now)
+        ## for testing (otherwise gives always 0 for now)
         random_offset = random.randint(1, 10)
         return attacker_score - defender_score + random_offset
 
