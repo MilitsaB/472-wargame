@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
 from time import sleep
-from typing import Tuple, TypeVar, Type, Iterable, ClassVar
+from typing import Tuple, TypeVar, Type, Iterable, ClassVar, List
 import random
 import requests
 
@@ -264,12 +264,12 @@ class Stats:
 ##############################################################################################################
 
 class TreeNode:
-    def __init__(self, id, game, e1=None, e2=-1, parent=None, max=False):
+    def __init__(self, id: int, game: Game, e1=None, e2=None, parent: TreeNode=None, max=False):
         self.id = id
         self.game = game
         self.e1 = e1  # any heuristic for simple minimax, or beta for e2 beta pruning
         self.e2 = e2  # strong heuristic for e2 beta pruning
-        self.children = []
+        self.children: List[TreeNode] = []
         self.parent = parent  # maybe useless
         self.max = max  # max = asc, min = desc
 
@@ -284,7 +284,7 @@ class Tree:
         self.root = None
         self.nodes = {}
 
-    def add_node(self, id, game, e1=-1, e2=-1, parent=None):
+    def add_node(self, id, game, e1=None, e2=None, parent=None):
         max_value = parent is None or not self.nodes[parent].max # can be removed for time optimization later
         node = TreeNode(id, game, e1=e1, e2=e2, parent=parent, max=max_value)
         self.nodes[id] = node
@@ -336,33 +336,42 @@ class Tree:
 
         return node.e1
 
-    # Needs review
     def alpha_beta_pruning(self, node=None):
         if node is None:
             node = self.root
 
-        return self._alpha_beta_pruning(node, float("-inf"), float("inf"))
+        e2, best_node = self._alpha_beta_pruning(node, float("-inf"), float("inf"))
+        return e2, best_node
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
+            # JUST FOR TESTING
             random_offset = random.randint(1, 3)
             node.e2 = max(0, node.e1 + random_offset)
-            return node.e2
+            return node.e2, node
 
         if node.max:
+            best_node = None  # Node that results in the best alpha value
             for child in node.children:
-                alpha = max(alpha, self._alpha_beta_pruning(child, alpha, beta))
+                new_alpha, new_node = self._alpha_beta_pruning(child, alpha, beta)
+                if new_alpha > alpha:
+                    alpha = new_alpha
+                    best_node = child  # Store the child node instead of the new_node
                 if beta <= alpha:
                     break
             node.e2 = alpha
-            return alpha
+            return alpha, best_node  # Return the child node along with the value
         else:
+            best_node = None  # Node that results in the best beta value
             for child in node.children:
-                beta = min(beta, self._alpha_beta_pruning(child, alpha, beta))
+                new_beta, new_node = self._alpha_beta_pruning(child, alpha, beta)
+                if new_beta < beta:
+                    beta = new_beta
+                    best_node = child  # Store the child node instead of the new_node
                 if beta <= alpha:
                     break
             node.e2 = beta
-            return beta
+            return beta, best_node  # Return the child node along with the value
 
     # only for debugging
     def print_tree(self, node=None, prefix="", is_last=True):
@@ -370,7 +379,7 @@ class Tree:
             node = self.root
 
         node_type = "(max)" if node.max else "(min)"
-        print(prefix + ("└── " if is_last else "├── ") + str(node.id) + " " + node_type)
+        print(prefix + ("└── " if is_last else "├── ") + str(node.e1) + " " + str(node.id) + " " + node_type)
 
         if node.children:
             for i, child in enumerate(node.children):
@@ -381,7 +390,7 @@ class Tree:
             node = self.root
 
         node_type = "(max)" if node.max else "(min)"
-        print(prefix + ("└── " if is_last else "├── ") + str(node.e2) + " " + node_type)
+        print(prefix + ("└── " if is_last else "├── ") + str(node.e2) + " " + str(node.id) + " " +node_type)
 
         if node.children:
             for i, child in enumerate(node.children):
@@ -798,7 +807,6 @@ class Game:
                 new_board = tree.nodes[parent].game.clone()
                 new_board.perform_move(next_move)
                 new_board.next_turn()
-                print(new_board)
                 e1 = None
 
                 # only calculates heuristic on leafs
@@ -812,7 +820,7 @@ class Game:
         if parent_id is None:
             self.initialize_game_tree()
             parent_id = 0
-            self.generate_game_states( leaf, parent=parent_id)
+            self.generate_game_states(leaf, parent=parent_id)
             depth -= 1
 
         else:
@@ -958,7 +966,7 @@ def main():
     if args.broker is not None:
         options.broker = args.broker
     if args.max_turns is not None:
-        options.max_turns=args.max_turns
+        options.max_turns = args.max_turns
 
     with open("gameTrace-<"+str(options.alpha_beta)+">-<"+str(options.max_time)+">-<"+str(options.max_turns)+">.txt", "w",encoding="utf-8") as file:
         file.write("Game Paramaters:\n"+str(options)+"\n")
@@ -966,10 +974,29 @@ def main():
     # create a new game
     game = Game(options=options)
     game.generate_game_tree_recursive(2, leaf=False)
+
+
+    tree.minimax()
+
+
+    tree.traverse_ordered()
+
+
+    result, node = tree.alpha_beta_pruning()
     tree.print_tree()
 
-    # tree.minimax()
-    # tree.print_tree()
+    node.children = []
+
+    print(node.children)
+
+    node.game.generate_game_tree_recursive(2, leaf=False, parent_id=node.id)
+    tree.print_tree()
+
+
+
+
+
+
 
     # the main game loop
     while True:
