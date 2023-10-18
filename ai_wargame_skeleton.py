@@ -922,12 +922,88 @@ class Game:
         random_offset = random.randint(1, 10)
         return attacker_score - defender_score + random_offset
 
-    #
-    # def heuristic_1(self):
+    def heuristic_1(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
+
+        attacker_score = 0
+        defender_score = 0
+            
+        for coord, unit in self.player_units(Player.Attacker):
+            attacker_score+=unit.health # takes into account repair too!!
+            if unit.type == UnitType.Virus:
+                attacker_score += 3
+            elif unit.type == UnitType.Tech:
+                attacker_score += 3
+            elif unit.type == UnitType.Firewall:
+                attacker_score += 3
+            elif unit.type == UnitType.Program:
+                attacker_score += 3
+            elif unit.type == UnitType.AI:
+                attacker_score += 9999
+
+        for coord, unit in self.player_units(Player.Defender):
+            defender_score+=unit.health
+            if unit.type == UnitType.Virus:
+                defender_score += 3
+            elif unit.type == UnitType.Tech:
+                defender_score += 3
+            elif unit.type == UnitType.Firewall:
+                defender_score += 3
+            elif unit.type == UnitType.Program:
+                defender_score += 3
+            elif unit.type == UnitType.AI:
+                defender_score += 9999
+        return attacker_score-defender_score
+    
+        
     #     #e1
     #
-    # def heuristic_2(self):
-    #     #e2
+    def heuristic_2(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
+
+        attacker_score = 0
+        defender_score = 0        
+              
+        for coord, unit in self.player_units(Player.Attacker):
+            for y in range(self.options.dim):
+                for x in range(self.options.dim):
+                    unit = self.get(Coord(x, y))
+                    coord = Coord(x, y)
+                    if unit and unit.player == self.next_player:
+                        for x in  coord.iter_all8_adjacent():
+                            if  x.is_valid_coord() and x.is_valid_move():
+                                attacker_score+=2
+            attacker_score+=unit.health # takes into account repair too!!
+            if unit.type == UnitType.Virus:
+                attacker_score += 3
+            elif unit.type == UnitType.Tech:
+                attacker_score += 3
+            elif unit.type == UnitType.Firewall:
+                attacker_score += 3
+            elif unit.type == UnitType.Program:
+                attacker_score += 3
+            elif unit.type == UnitType.AI:
+                attacker_score += 9999
+
+        for coord, unit in self.player_units(Player.Defender):
+            for y in range(self.options.dim):
+                for x in range(self.options.dim):
+                    unit = self.get(Coord(x, y))
+                    coord = Coord(x, y)
+                    if unit and unit.player == self.next_player:
+                        for x in  coord.iter_all8_adjacent():
+                            if  x.is_valid_coord() and x.is_valid_move():
+                                defender_score+=2
+            defender_score+=unit.health
+            if unit.type == UnitType.Virus:
+                defender_score += 3
+            elif unit.type == UnitType.Tech:
+                defender_score += 3
+            elif unit.type == UnitType.Firewall:
+                defender_score += 3
+            elif unit.type == UnitType.Program:
+                defender_score += 3
+            elif unit.type == UnitType.AI:
+                defender_score += 9999
+        return attacker_score-defender_score
 
     """IGNORE THIS"""
 
