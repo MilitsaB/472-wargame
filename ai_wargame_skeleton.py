@@ -359,8 +359,8 @@ class Tree:
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
             # JUST FOR TESTING, will be replaced heuristic_2()
-            random_offset = random.randint(1, 3)
-            node.e2 = max(0, node.e1 + random_offset)
+            # random_offset = random.randint(1, 3)
+            # node.e2 = max(0, node.e1 + random_offset)
             return node.e2, node
 
         if node.max:
@@ -859,13 +859,15 @@ class Game:
                 new_board.perform_move(next_move)
                 new_board.next_turn()
                 e1 = None
+                e2 = None
                 # only calculates heuristic on leafs
                 if leaf:
                     """ Add heuristic calculation !!! """
-                    e1 = new_board.heuristic_0()
+                    e1 = new_board.heuristic_1()
+                    e2 = new_board.heuristic_2()
 
                 # adds new game state as a node in tree
-                tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
+                tree.add_node(ID, game=new_board, move=next_move, e1=e1, e2=e2, parent=parent)
                 ID += 1
 
     """ Generates tree of moves for each round """
@@ -918,9 +920,7 @@ class Game:
             elif unit.type == UnitType.AI:
                 defender_score += 9999
 
-        ## for testing (otherwise gives always 0 for now)
-        random_offset = random.randint(1, 10)
-        return attacker_score - defender_score + random_offset
+        return attacker_score - defender_score
 
     def heuristic_1(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
@@ -969,7 +969,7 @@ class Game:
                     coord = Coord(x, y)
                     if unit and unit.player == self.next_player:
                         for x in  coord.iter_all8_adjacent():
-                            if  x.is_valid_coord() and x.is_valid_move():
+                            if  self.is_valid_coord(x) and self.is_valid_move(x):
                                 attacker_score+=2
             attacker_score+=unit.health # takes into account repair too!!
             if unit.type == UnitType.Virus:
@@ -989,10 +989,10 @@ class Game:
                     unit = self.get(Coord(x, y))
                     coord = Coord(x, y)
                     if unit and unit.player == self.next_player:
-                        for x in  coord.iter_all8_adjacent():
-                            if  x.is_valid_coord() and x.is_valid_move():
-                                defender_score+=2
-            defender_score+=unit.health
+                        for x in coord.iter_all8_adjacent():
+                            if x.is_valid_coord() and x.is_valid_move():
+                                defender_score += 2
+            defender_score += unit.health
             if unit.type == UnitType.Virus:
                 defender_score += 3
             elif unit.type == UnitType.Tech:
