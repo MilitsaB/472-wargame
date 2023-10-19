@@ -790,7 +790,8 @@ class Game:
         # TODO: based on max_time given by user, set depth of recursive calls according to that.
         #  Can set different depth depending on where we are in the game, that's why its avg
         # Question: do we need a depth attribute to a tree node?
-        avg_depth = 3
+        avg_depth = 5
+
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
 
@@ -842,14 +843,17 @@ class Game:
     def generate_unit_moves(self, coord: Coord, leaf, parent=None):
         x, y = coord.row, coord.col
         global ID
+        inCombat = False
 
-        directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
+        directions = [(0, -1), (-1, 0), (1, 0), (0, 1)]  # Up, Left, Right, Down, Self-destruct
 
         for dx, dy in directions:
             new_x, new_y = x + dx, y + dy
             new_coord = Coord(new_x, new_y)
             next_move = CoordPair(coord, new_coord)
-            result, _, _ = tree.nodes[parent].game.is_valid_move(next_move)
+            result, _, invalidMove = tree.nodes[parent].game.is_valid_move(next_move)
+            if invalidMove == "Sorry, this player is engaged in combat.":
+                inCombat = True
 
             # if move is valid, perform move
             if result:
@@ -865,6 +869,22 @@ class Game:
                 # adds new game state as a node in tree
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
+
+        if inCombat:
+            # self-destruct only in combat
+            next_move = CoordPair(coord, coord)
+            new_board = tree.nodes[parent].game.clone()
+            new_board.perform_move(next_move)
+            new_board.next_turn()
+            e1 = None
+            # only calculates heuristic on leafs
+            if leaf:
+                """ Add heuristic calculation !!! """
+                e1 = new_board.heuristic_1()
+
+            # adds new game state as a node in tree
+            tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
+            ID += 1
 
     """ Generates tree of moves for each round """
     def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
