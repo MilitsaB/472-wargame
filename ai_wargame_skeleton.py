@@ -977,7 +977,7 @@ class Game:
                 unit = self.get(Coord(x, y))
                 if unit and unit.type == UnitType.AI:
                     if unit.player == Player.Attacker:
-                        defender_ai_coord = Coord(x, y)
+                        attacker_ai_coord = Coord(x, y)
                     else:
                         defender_ai_coord = Coord(x, y)
         
@@ -985,7 +985,7 @@ class Game:
             # Threat bonus if a Virus is close to opponent's AI
             if defender_ai_coord is not None and unit.type == UnitType.Virus:
                 distance_to_opponent_ai = coord.euclidean_distance_to(defender_ai_coord)
-                attacker_score += 75 / (distance_to_opponent_ai + 1)
+                attacker_score += 50 / (distance_to_opponent_ai + 1)
 
             # Other scoring remains similar to original heuristic_2
             for y in range(self.options.dim):
@@ -1018,7 +1018,7 @@ class Game:
                 for opp_coord, opp_unit in self.player_units(Player.Attacker):
                     if opp_unit.type == UnitType.Virus:
                         distance_to_virus = coord.euclidean_distance_to(opp_coord)
-                        defender_score -= 75 / (distance_to_virus + 1)  # Negative score for potential threat
+                        defender_score -= 50 / (distance_to_virus + 1)  # Negative score for potential threat
 
             # Other scoring remains similar to original heuristic_2
             for y in range(self.options.dim):
