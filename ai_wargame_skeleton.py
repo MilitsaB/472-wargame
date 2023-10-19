@@ -358,9 +358,7 @@ class Tree:
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
-            # JUST FOR TESTING, will be replaced heuristic_2()
-            # random_offset = random.randint(1, 3)
-            # node.e2 = max(0, node.e1 + random_offset)
+            node.e2 = node.game.heuristic_2()
             return node.e2, node
 
         if node.max:
@@ -859,15 +857,13 @@ class Game:
                 new_board.perform_move(next_move)
                 new_board.next_turn()
                 e1 = None
-                e2 = None
                 # only calculates heuristic on leafs
                 if leaf:
                     """ Add heuristic calculation !!! """
                     e1 = new_board.heuristic_1()
-                    e2 = new_board.heuristic_2()
 
                 # adds new game state as a node in tree
-                tree.add_node(ID, game=new_board, move=next_move, e1=e1, e2=e2, parent=parent)
+                tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
 
     """ Generates tree of moves for each round """
@@ -960,7 +956,7 @@ class Game:
     def heuristic_2(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
         attacker_score = 0
-        defender_score = 0   
+        defender_score = 0
               
         for coord, unit in self.player_units(Player.Attacker):
             for y in range(self.options.dim):
