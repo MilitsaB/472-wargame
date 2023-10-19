@@ -792,7 +792,7 @@ class Game:
         # TODO: based on max_time given by user, set depth of recursive calls according to that.
         #  Can set different depth depending on where we are in the game, that's why its avg
         # Question: do we need a depth attribute to a tree node?
-        avg_depth = 2
+        avg_depth = 3
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
 
@@ -930,26 +930,26 @@ class Game:
         for coord, unit in self.player_units(Player.Attacker):
             attacker_score+=unit.health # takes into account repair too!!
             if unit.type == UnitType.Virus:
-                attacker_score += 3
+                attacker_score += 20
             elif unit.type == UnitType.Tech:
-                attacker_score += 3
+                attacker_score += 20
             elif unit.type == UnitType.Firewall:
-                attacker_score += 3
+                attacker_score += 15
             elif unit.type == UnitType.Program:
-                attacker_score += 3
+                attacker_score += 10
             elif unit.type == UnitType.AI:
                 attacker_score += 9999
 
         for coord, unit in self.player_units(Player.Defender):
             defender_score+=unit.health
             if unit.type == UnitType.Virus:
-                defender_score += 3
+                defender_score += 20
             elif unit.type == UnitType.Tech:
-                defender_score += 3
+                defender_score += 20
             elif unit.type == UnitType.Firewall:
-                defender_score += 3
+                defender_score += 15
             elif unit.type == UnitType.Program:
-                defender_score += 3
+                defender_score += 10
             elif unit.type == UnitType.AI:
                 defender_score += 9999
         return attacker_score-defender_score
@@ -960,7 +960,7 @@ class Game:
     def heuristic_2(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
         attacker_score = 0
-        defender_score = 0        
+        defender_score = 0   
               
         for coord, unit in self.player_units(Player.Attacker):
             for y in range(self.options.dim):
@@ -969,17 +969,17 @@ class Game:
                     coord = Coord(x, y)
                     if unit and unit.player == self.next_player:
                         for x in  coord.iter_all8_adjacent():
-                            if  x.is_valid_coord() and x.is_valid_move():
+                            if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
                                 attacker_score+=2
             attacker_score+=unit.health # takes into account repair too!!
             if unit.type == UnitType.Virus:
-                attacker_score += 3
+                attacker_score += 20
             elif unit.type == UnitType.Tech:
-                attacker_score += 3
+                attacker_score += 20
             elif unit.type == UnitType.Firewall:
-                attacker_score += 3
+                attacker_score += 15
             elif unit.type == UnitType.Program:
-                attacker_score += 3
+                attacker_score += 10
             elif unit.type == UnitType.AI:
                 attacker_score += 9999
 
@@ -990,17 +990,17 @@ class Game:
                     coord = Coord(x, y)
                     if unit and unit.player == self.next_player:
                         for x in  coord.iter_all8_adjacent():
-                            if  x.is_valid_coord() and x.is_valid_move():
+                            if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
                                 defender_score+=2
             defender_score+=unit.health
             if unit.type == UnitType.Virus:
-                defender_score += 3
+                defender_score += 20
             elif unit.type == UnitType.Tech:
-                defender_score += 3
+                defender_score += 20
             elif unit.type == UnitType.Firewall:
-                defender_score += 3
+                defender_score += 15
             elif unit.type == UnitType.Program:
-                defender_score += 3
+                defender_score += 10
             elif unit.type == UnitType.AI:
                 defender_score += 9999
         return attacker_score-defender_score
