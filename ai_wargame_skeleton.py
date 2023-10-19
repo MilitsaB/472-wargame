@@ -971,6 +971,7 @@ class Game:
                         for x in  coord.iter_all8_adjacent():
                             if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
                                 attacker_score+=2
+        for coord, unit in self.player_units(Player.Attacker):
             attacker_score+=unit.health # takes into account repair too!!
             if unit.type == UnitType.Virus:
                 attacker_score += 20
