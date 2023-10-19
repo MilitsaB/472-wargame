@@ -154,6 +154,13 @@ class Coord:
         yield Coord(self.row + 1, self.col)
         yield Coord(self.row, self.col + 1)
 
+    def euclidean_distance_to(self, other):
+        dx = other.col - self.col
+        dy = other.row - self.row
+        return (dx**2 + dy**2)**0.5
+
+
+
     # Method added by our team
     def iter_all8_adjacent(self) -> Iterable[Coord]:
         """Iterates over all 8 adjacent coordinates including diagonals."""
@@ -191,6 +198,7 @@ class CoordPair:
     """Representation of a game move or a rectangular area via 2 Coords."""
     src: Coord = field(default_factory=Coord)
     dst: Coord = field(default_factory=Coord)
+    
 
     def to_string(self) -> str:
         """Text representation of a CoordPair."""
@@ -790,7 +798,7 @@ class Game:
         # TODO: based on max_time given by user, set depth of recursive calls according to that.
         #  Can set different depth depending on where we are in the game, that's why its avg
         # Question: do we need a depth attribute to a tree node?
-        avg_depth = 3
+        avg_depth = 2
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
 
@@ -860,7 +868,7 @@ class Game:
                 # only calculates heuristic on leafs
                 if leaf:
                     """ Add heuristic calculation !!! """
-                    e1 = new_board.heuristic_1()
+                    e1 = new_board.heuristic_1() # E!
 
                 # adds new game state as a node in tree
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
@@ -924,83 +932,177 @@ class Game:
         defender_score = 0
             
         for coord, unit in self.player_units(Player.Attacker):
-            attacker_score+=unit.health # takes into account repair too!!
             if unit.type == UnitType.Virus:
                 attacker_score += 20
+                attacker_score += unit.health*2
             elif unit.type == UnitType.Tech:
                 attacker_score += 20
+                attacker_score += unit.health*2
             elif unit.type == UnitType.Firewall:
                 attacker_score += 15
+                attacker_score += unit.health*1.5
             elif unit.type == UnitType.Program:
                 attacker_score += 10
+                attacker_score += unit.health*1
             elif unit.type == UnitType.AI:
                 attacker_score += 9999
 
         for coord, unit in self.player_units(Player.Defender):
-            defender_score+=unit.health
             if unit.type == UnitType.Virus:
                 defender_score += 20
+                defender_score += unit.health*2
             elif unit.type == UnitType.Tech:
                 defender_score += 20
+                defender_score += unit.health*2
             elif unit.type == UnitType.Firewall:
                 defender_score += 15
+                defender_score += unit.health*1.5
             elif unit.type == UnitType.Program:
                 defender_score += 10
+                defender_score += unit.health*1
             elif unit.type == UnitType.AI:
                 defender_score += 9999
+                
         return attacker_score-defender_score
+    
+    def heuristic_2(self) -> int:
+        attacker_score = 0
+        defender_score = 0
+        
+        # Locate the positions of both AIs
+        attacker_ai_coord = None
+        defender_ai_coord = None
+        for y in range(self.options.dim):
+            for x in range(self.options.dim):
+                unit = self.get(Coord(x, y))
+                if unit and unit.type == UnitType.AI:
+                    if unit.player == Player.Attacker:
+                        defender_ai_coord = Coord(x, y)
+                    else:
+                        defender_ai_coord = Coord(x, y)
+        
+        for coord, unit in self.player_units(Player.Attacker):
+            # Threat bonus if a Virus is close to opponent's AI
+            if defender_ai_coord is not None and unit.type == UnitType.Virus:
+                distance_to_opponent_ai = coord.euclidean_distance_to(defender_ai_coord)
+                attacker_score += 75 / (distance_to_opponent_ai + 1)
+
+            # Other scoring remains similar to original heuristic_2
+            for y in range(self.options.dim):
+                for x in range(self.options.dim):
+                    unit = self.get(Coord(x, y))
+                    coord = Coord(x, y)
+                    if unit and unit.player == self.next_player:
+                        for x in coord.iter_all8_adjacent():
+                            if self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord, x)):
+                                attacker_score += 2
+        for coord, unit in self.player_units(Player.Attacker):
+            if unit.type == UnitType.Virus:
+                attacker_score += 20
+                attacker_score += unit.health*2
+            elif unit.type == UnitType.Tech:
+                attacker_score += 20
+                attacker_score += unit.health*2
+            elif unit.type == UnitType.Firewall:
+                attacker_score += 15
+                attacker_score += unit.health*1.5
+            elif unit.type == UnitType.Program:
+                attacker_score += 10
+                attacker_score += unit.health*1
+            elif unit.type == UnitType.AI:
+                attacker_score += 9999
+
+        for coord, unit in self.player_units(Player.Defender):
+            # Defense bonus if own AI is close to an opponent's Virus
+            if unit.type == UnitType.AI:
+                for opp_coord, opp_unit in self.player_units(Player.Attacker):
+                    if opp_unit.type == UnitType.Virus:
+                        distance_to_virus = coord.euclidean_distance_to(opp_coord)
+                        defender_score -= 75 / (distance_to_virus + 1)  # Negative score for potential threat
+
+            # Other scoring remains similar to original heuristic_2
+            for y in range(self.options.dim):
+                for x in range(self.options.dim):
+                    unit = self.get(Coord(x, y))
+                    coord = Coord(x, y)
+                    if unit and unit.player == self.next_player:
+                        for x in coord.iter_all8_adjacent():
+                            if self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord, x)):
+                                defender_score += 2
+        for coord, unit in self.player_units(Player.Defender):
+            if unit.type == UnitType.Virus:
+                defender_score += 20
+                defender_score += unit.health*2
+            elif unit.type == UnitType.Tech:
+                defender_score += 20
+                defender_score += unit.health*2
+            elif unit.type == UnitType.Firewall:
+                defender_score += 15
+                defender_score += unit.health*1.5
+            elif unit.type == UnitType.Program:
+                defender_score += 10
+                defender_score += unit.health*1
+            elif unit.type == UnitType.AI:
+                defender_score += 9999
+                
+            #randomness reduces repeated satates
+            attacker_score+=random.randrange(30)
+            defender_score+=random.randrange(30)
+
+        return attacker_score - defender_score
     
         
     #     #e1
     #
-    def heuristic_2(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
+    # def heuristic_2(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
-        attacker_score = 0
-        defender_score = 0
+    #     attacker_score = 0
+    #     defender_score = 0
               
-        for coord, unit in self.player_units(Player.Attacker):
-            for y in range(self.options.dim):
-                for x in range(self.options.dim):
-                    unit = self.get(Coord(x, y))
-                    coord = Coord(x, y)
-                    if unit and unit.player == self.next_player:
-                        for x in  coord.iter_all8_adjacent():
-                            if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
-                                attacker_score+=2
-        for coord, unit in self.player_units(Player.Attacker):
-            attacker_score+=unit.health # takes into account repair too!!
-            if unit.type == UnitType.Virus:
-                attacker_score += 20
-            elif unit.type == UnitType.Tech:
-                attacker_score += 20
-            elif unit.type == UnitType.Firewall:
-                attacker_score += 15
-            elif unit.type == UnitType.Program:
-                attacker_score += 10
-            elif unit.type == UnitType.AI:
-                attacker_score += 9999
+    #     for coord, unit in self.player_units(Player.Attacker):
+    #         for y in range(self.options.dim):
+    #             for x in range(self.options.dim):
+    #                 unit = self.get(Coord(x, y))
+    #                 coord = Coord(x, y)
+    #                 if unit and unit.player == self.next_player:
+    #                     for x in  coord.iter_all8_adjacent():
+    #                         if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
+    #                             attacker_score+=2
+    #     for coord, unit in self.player_units(Player.Attacker):
+    #         attacker_score+=unit.health # takes into account repair too!!
+    #         if unit.type == UnitType.Virus:
+    #             attacker_score += 20
+    #         elif unit.type == UnitType.Tech:
+    #             attacker_score += 20
+    #         elif unit.type == UnitType.Firewall:
+    #             attacker_score += 15
+    #         elif unit.type == UnitType.Program:
+    #             attacker_score += 10
+    #         elif unit.type == UnitType.AI:
+    #             attacker_score += 9999
 
-        for coord, unit in self.player_units(Player.Defender):
-            for y in range(self.options.dim):
-                for x in range(self.options.dim):
-                    unit = self.get(Coord(x, y))
-                    coord = Coord(x, y)
-                    if unit and unit.player == self.next_player:
-                        for x in  coord.iter_all8_adjacent():
-                            if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
-                                defender_score+=2
-            defender_score+=unit.health
-            if unit.type == UnitType.Virus:
-                defender_score += 20
-            elif unit.type == UnitType.Tech:
-                defender_score += 20
-            elif unit.type == UnitType.Firewall:
-                defender_score += 15
-            elif unit.type == UnitType.Program:
-                defender_score += 10
-            elif unit.type == UnitType.AI:
-                defender_score += 9999
-        return attacker_score-defender_score
+    #     for coord, unit in self.player_units(Player.Defender):
+    #         for y in range(self.options.dim):
+    #             for x in range(self.options.dim):
+    #                 unit = self.get(Coord(x, y))
+    #                 coord = Coord(x, y)
+    #                 if unit and unit.player == self.next_player:
+    #                     for x in  coord.iter_all8_adjacent():
+    #                         if  self.is_valid_coord(x) and self.is_valid_move(CoordPair(coord,x)):
+    #                             defender_score+=2
+    #     for coord, unit in self.player_units(Player.Defender):
+    #         defender_score+=unit.health
+    #         if unit.type == UnitType.Virus:
+    #             defender_score += 20
+    #         elif unit.type == UnitType.Tech:
+    #             defender_score += 20
+    #         elif unit.type == UnitType.Firewall:
+    #             defender_score += 15
+    #         elif unit.type == UnitType.Program:
+    #             defender_score += 10
+    #         elif unit.type == UnitType.AI:
+    #             defender_score += 9999
+    #     return attacker_score-defender_score
 
     """IGNORE THIS"""
 
