@@ -619,6 +619,11 @@ class Game:
             elif self.next_player == Player.Defender and move_type == "self-destruct":
                 file.write("Defender self-destruct\n")
 
+            if self.next_player == Player.Attacker and move_type == "Invalid move":
+                file.write("Attacker invalid move\n")
+            elif self.next_player == Player.Defender and move_type == "Invalid move":
+                file.write("Defender invalid move\n")
+
     def perform_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type, error = self.is_valid_move(coords)
@@ -640,6 +645,9 @@ class Game:
                 self.log_move(move_type, coords)
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
+            
+        elif move_type == "Invalid move":
+                self.log_move(move_type, coords)
 
         print(error)
         return (False, "Invalid move",)
