@@ -838,7 +838,6 @@ class Game:
 
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
-        tree.print_tree()
         print("children",CHILDREN,PARENT)
 
         result, node = tree.minimax(current_node)
@@ -889,6 +888,7 @@ class Game:
     def generate_unit_moves(self, coord: Coord, leaf, parent=None):
         x, y = coord.row, coord.col
         global ID
+        global CHILDREN
         inCombat = False
 
         directions = [(0, -1), (-1, 0), (1, 0), (0, 1)]  # Up, Left, Right, Down, Self-destruct
@@ -913,6 +913,7 @@ class Game:
                     e1 = new_board.heuristic_1() # E!
 
                 # adds new game state as a node in tree
+                CHILDREN+=1
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
 
@@ -929,8 +930,10 @@ class Game:
                 e1 = new_board.heuristic_1()
 
             # adds new game state as a node in tree
+            CHILDREN+=1
             tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
             ID += 1
+
 
     """ Generates tree of moves for each round """
     def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
