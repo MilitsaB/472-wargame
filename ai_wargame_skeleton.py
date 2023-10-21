@@ -9,6 +9,9 @@ from typing import Tuple, TypeVar, Type, Iterable, ClassVar, List, Optional
 import random
 import requests
 
+CHILDREN=0
+PARENT=0
+
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
@@ -293,6 +296,7 @@ class Tree:
     def __init__(self):
         self.root = None
         self.nodes = {}
+        self.stats=Stats
 
     def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None, parent: TreeNode = None):
         max_value = parent is None or not self.nodes[parent].max  # sets if its maximizing or minimizing
@@ -356,6 +360,7 @@ class Tree:
             return min_value, min_child
 
     def alpha_beta_pruning(self, node=None):
+        # total_evals=0
         # If not given, starting node is root
         if node is None:
             node = self.root
@@ -366,6 +371,7 @@ class Tree:
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
+            # self.stats.evaluations_per_depth[0:total_evals]
             node.e2 = node.game.heuristic_2()
             return node.e2, node
 
@@ -640,6 +646,25 @@ class Game:
                 self.log_move(move_type, coords)
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
+            
+    def ai_move(self, coords: CoordPair) -> Tuple[bool, str]:
+        """Validate and perform a move expressed as a CoordPair."""
+        is_valid, move_type, error = self.is_valid_move(coords)
+        if is_valid:
+            if move_type == "valid move":
+                self.set(coords.dst, self.get(coords.src))
+                self.set(coords.src, None)
+                return (True, "Move initiated")
+            if move_type == "attack":
+                self.perform_attack(coords)
+                return (True, "Attack initiated")
+            if move_type == "repair":
+                self.perform_repair(coords)
+                return (True, "Repair initiated")
+            if move_type == "self-destruct":
+                self.perform_self_destruction(coords)
+                return (True, "Self-destruction initiated")
+
 
         print(error)
         return (False, "Invalid move",)
@@ -676,9 +701,16 @@ class Game:
             output += "\n"
         with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
-            file.write("Board:\n" + output)
+            file.write(f"Board:\n  {output}")
 
         return output
+    def determine_branching_factor(self):
+        try:
+            branching_factor=CHILDREN/PARENT
+        except ZeroDivisionError:
+            branching_factor=0
+        return branching_factor
+        
 
     def __str__(self) -> str:
         """Default string representation of a game."""
@@ -744,6 +776,10 @@ class Game:
             if success:
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
+                print(f"branching factor {self.determine_branching_factor()}")
+                with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+                    file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
                 self.next_turn()
         return mv
 
@@ -798,10 +834,12 @@ class Game:
         # TODO: based on max_time given by user, set depth of recursive calls according to that.
         #  Can set different depth depending on where we are in the game, that's why its avg
         # Question: do we need a depth attribute to a tree node?
-        avg_depth = 5
+        avg_depth = 2
 
         self.generate_game_tree_recursive(avg_depth, leaf=False, parent_id=current_node_id)
         current_node = tree.nodes[current_node_id]
+        tree.print_tree()
+        print("children",CHILDREN,PARENT)
 
         result, node = tree.minimax(current_node)
 
@@ -866,7 +904,7 @@ class Game:
             # if move is valid, perform move
             if result:
                 new_board = tree.nodes[parent].game.clone()
-                new_board.perform_move(next_move)
+                new_board.ai_move(next_move)
                 new_board.next_turn()
                 e1 = None
                 # only calculates heuristic on leafs
@@ -882,7 +920,7 @@ class Game:
             # self-destruct only in combat
             next_move = CoordPair(coord, coord)
             new_board = tree.nodes[parent].game.clone()
-            new_board.perform_move(next_move)
+            new_board.ai_move(next_move)
             new_board.next_turn()
             e1 = None
             # only calculates heuristic on leafs
@@ -896,14 +934,21 @@ class Game:
 
     """ Generates tree of moves for each round """
     def generate_game_tree_recursive(self, depth, leaf, parent_id=None):
+        global PARENT
+        global CHILDREN
         if parent_id is None or parent_id == 0:
             self.initialize_game_tree()
             parent_id = 0
             depth -= 1
+            PARENT+=1
+            
 
         # Only generate game states on leaf
         if not tree.nodes[parent_id].children:
             tree.nodes[parent_id].game.generate_game_states(leaf, parent=parent_id)
+            
+        # if not tree.nodes[parent_id].children:
+        #     CHILDREN += 1 
 
         if depth == 0:  # Base case: Stop recursion when depth reaches 0
             return
@@ -913,7 +958,10 @@ class Game:
 
         # recursive call to generate the game tree for each child node
         for child in tree.nodes[parent_id].children:
+            if leaf == True:
+                PARENT+=1
             tree.nodes[parent_id].game.generate_game_tree_recursive(depth - 1, leaf, parent_id=child.id)
+        
 
     """ e0 given by instructions """
     def heuristic_0(self):
@@ -1232,6 +1280,9 @@ def main():
     while True:
         print()
         print(game)
+        # with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
+        #     options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+        #     file.write(game.to_string())
         winner = game.has_winner()
         if winner is not None:
             with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
