@@ -364,7 +364,7 @@ class Tree:
             node.e1 = min_value
             return min_value, min_child
         
-    def calcualte_evaluations(self, depth: int ): #temp_evals: int
+    def calculate_evaluations(self, depth: int ): #temp_evals: int
         # tree.temp_evals+=1
         self.total_evals+=1
         self.stats[depth]=self.total_evals
@@ -383,7 +383,7 @@ class Tree:
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
-            self.calcualte_evaluations(tree.depth)
+            self.calculate_evaluations(tree.depth)
             node.e2 = node.game.heuristic_2()
             return node.e2, node
 
