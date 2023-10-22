@@ -296,7 +296,12 @@ class Tree:
     def __init__(self):
         self.root = None
         self.nodes = {}
-        self.stats=Stats
+        self.stats={}
+        self.total_evals=0
+        self.depth=0
+        # self.temp_evals=0
+
+
 
     def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None, parent: TreeNode = None):
         max_value = parent is None or not self.nodes[parent].max  # sets if its maximizing or minimizing
@@ -358,9 +363,16 @@ class Tree:
                     min_child = child
             node.e1 = min_value
             return min_value, min_child
+        
+    def calcualte_evaluations(self, depth: int ): #temp_evals: int
+        # tree.temp_evals+=1
+        self.total_evals+=1
+        self.stats[depth]=self.total_evals
+
 
     def alpha_beta_pruning(self, node=None):
-        # total_evals=0
+        tree.depth+=1
+        # tree.temp_evals=0
         # If not given, starting node is root
         if node is None:
             node = self.root
@@ -371,7 +383,7 @@ class Tree:
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
-            # self.stats.evaluations_per_depth[0:total_evals]
+            self.calcualte_evaluations(tree.depth)
             node.e2 = node.game.heuristic_2()
             return node.e2, node
 
@@ -774,12 +786,14 @@ class Game:
         if mv is not None:
             (success, result) = self.perform_move(mv)
             if success:
+                print(f"tree size {len(tree.nodes)}")
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
                 print(f"branching factor {self.determine_branching_factor()}")
+                print(f"Total evals {tree.total_evals}")
                 with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
-                    file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
+                    file.write(f"branching factor {self.determine_branching_factor()}\n")
                 self.next_turn()
         return mv
 
@@ -857,16 +871,35 @@ class Game:
 
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
+        with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+            file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
+            file.write(f"Heuristic score: {score}\n")
+            file.write(f"Average recursive depth: {avg_depth:0.1f}\n")
+            file.write(f"Evals per depth: ")
+            for k in sorted(tree.stats.keys()):
+                file.write(f"{k}:{tree.stats[k]} ")
+            for k in sorted(tree.stats.keys()):
+                file.write(f"{k}:{int(tree.stats[k]/tree.total_evals)*100}% ")
+            if self.stats.total_seconds > 0:
+                file.write(f"\nEval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
+            file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
+        
         print(f"Heuristic score: {score}")
         print(f"Average recursive depth: {avg_depth:0.1f}")
         print(f"Evals per depth: ", end='')
-        for k in sorted(self.stats.evaluations_per_depth.keys()):
-            print(f"{k}:{self.stats.evaluations_per_depth[k]} ", end='')
+        for k in sorted(tree.stats.keys()):
+            print(f"{k}:{tree.stats[k]} ", end='')
         print()
-        total_evals = sum(self.stats.evaluations_per_depth.values())
+        for k in sorted(tree.stats.keys()):
+            print(f"{k}:{int(tree.stats[k]/tree.total_evals)*100}% ", end='')
+        print()
+        # total_evals = sum(self.stats.values())
         if self.stats.total_seconds > 0:
-            print(f"Eval perf.: {total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
+            print(f"Eval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
+        
+        
         return move
 
     """Initializes the game tree by adding the root node"""
@@ -943,7 +976,7 @@ class Game:
             self.initialize_game_tree()
             parent_id = 0
             depth -= 1
-            PARENT+=1
+            PARENT += 1
             
 
         # Only generate game states on leaf
