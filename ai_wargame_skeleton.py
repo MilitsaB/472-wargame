@@ -1,18 +1,15 @@
 from __future__ import annotations
 import argparse
 import copy
-import sys
-import time
 from collections import deque, defaultdict
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
 from time import sleep
-from typing import Tuple, TypeVar, Type, Iterable, ClassVar, List, Optional
+from typing import Tuple, Iterable, ClassVar, List, Optional
 import random
 import requests
 
-CHILDREN = 0
 PARENT = 0
 ID = 0
 
@@ -611,9 +608,10 @@ class Game:
     def perform_attack(self, coords: CoordPair):
         src = self.get(coords.src)
         dst = self.get(coords.dst)
-        damage = src.damage_table[src.type.value][dst.type.value]
-        self.mod_health(coords.src, -damage)
-        self.mod_health(coords.dst, -damage)
+        dstDamage = src.damage_table[src.type.value][dst.type.value]
+        srcDamage = src.damage_table[dst.type.value][src.type.value]
+        self.mod_health(coords.src, -srcDamage)
+        self.mod_health(coords.dst, -dstDamage)
 
     def perform_repair(self, coords: CoordPair):
         src = self.get(coords.src)
@@ -679,6 +677,11 @@ class Game:
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
 
+        else:
+            if error is not None:
+                print(error)
+            return (False, "Invalid move")
+
     def ai_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type, error = self.is_valid_move(coords)
@@ -698,7 +701,7 @@ class Game:
                 return (True, "Self-destruction initiated")
 
         print(error)
-        return (False, "Invalid move",)
+        return (False, "Invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
@@ -738,7 +741,7 @@ class Game:
 
     def determine_branching_factor(self):
         try:
-            branching_factor = CHILDREN / PARENT
+            branching_factor = (len(tree.nodes)-1) / PARENT
         except ZeroDivisionError:
             branching_factor = 0
         return branching_factor
@@ -783,11 +786,15 @@ class Game:
         else:
             while True:
                 mv = self.read_move()
-                (success, result) = self.perform_move(mv)
-                if success:
-                    print(f"Player {self.next_player.name}: ", end='')
-                    print(result)
-                    self.next_turn()
+                if mv is not None:
+                    (success, result) = self.perform_move(mv)
+                    if success:
+                        print(f"Player {self.next_player.name}: ", end='')
+                        print(result)
+                        self.next_turn()
+
+                    if not success:
+                        print("The move is not valid! Try again.")
 
                     # If human is playing against AI, update the current_node of tree
                     if (
@@ -797,8 +804,6 @@ class Game:
                                 current_node_id = child.id
                                 break
                     break
-                else:
-                    print("The move is not valid! Try again.")
 
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
@@ -939,7 +944,7 @@ class Game:
                 file.write(f"\nEval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
             file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
 
-        print(f"Heuristic score: {score}")
+        print(f"Heuristic score: {score:0.2f}")
         print(f"Heuristic used: {'e2' if self.options.alpha_beta else 'e1'}") # change to e0 if used
         print(f"Elapsed time: {elapsed_seconds:0.1f}s\n")
         if elapsed_seconds > self.options.max_time:
@@ -989,7 +994,7 @@ class Game:
     """Generate possible moves for the given unit at the given coordinate"""
     def generate_unit_moves(self, coord: Coord, parent=None):
         x, y = coord.row, coord.col
-        global ID, CHILDREN
+        global ID
         inCombat = False
         count = 0
 
@@ -1006,7 +1011,6 @@ class Game:
             result, _, invalidMove = tree.nodes[parent].game.is_valid_move(next_move)
             if invalidMove == "Sorry, this player is engaged in combat.":
                 unit = self.get(Coord(new_x, new_y))
-                me = self.get(Coord(x, y))
                 if unit is not None and unit.player != self.next_player:
                     count += 1
                 inCombat = True
@@ -1024,10 +1028,9 @@ class Game:
                 # adds new game state as a node in tree
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
                 ID += 1
-                CHILDREN += 1
 
-        unit = self.get(Coord(x, y))
         if inCombat:
+            unit = self.get(Coord(x, y))
             if unit.health < 3 or count > 1:
                 # self-destruct is only explored if unit is in combat
                 # and already has low health or is surrounded by enemy players
@@ -1042,12 +1045,11 @@ class Game:
 
                 # adds new game state as a node in tree
                 tree.add_node(ID, game=new_board, move=next_move, e1=e1, parent=parent)
-                CHILDREN += 1
                 ID += 1
 
     """ Generates tree of moves for each level """
     def generate_game_tree_bfs(self, max_depth, parent_id=0):
-        global PARENT, CHILDREN, time_limit_exceeded, depth_counts
+        global PARENT, time_limit_exceeded, depth_counts
 
         exited_early = False
 
@@ -1089,9 +1091,6 @@ class Game:
             depth_counts[current_depth]["count"] += new_children_count
 
             if depth > 1:
-                # PARENT += new_children_count
-                # if tree.depth == 4:
-                #     print(new_children_count)
                 for child in tree.nodes[current_id].children:
                     queue.append((child.id, depth - 1))
 
