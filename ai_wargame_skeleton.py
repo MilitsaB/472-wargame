@@ -384,7 +384,7 @@ class Tree:
 
     def calculate_evaluations(self, depth: int):  # temp_evals: int
         self.total_evals += 1
-        self.stats[depth] = self.total_evals
+        self.stats[depth] = self.stats.get(depth, 0) + 1
 
     def alpha_beta_pruning(self, node=None):
         # If not given, starting node is root
@@ -807,10 +807,12 @@ class Game:
             (success, result) = self.perform_move(mv)
             if success:
                 print(f"Tree Size: {len(tree.nodes)}")
-                print(f"Computer {self.next_player.name}: ", end='')
+                print(f"Branching Factor: {self.determine_branching_factor():1f}")
+                print(f"\nNumber of games states for this move: \n", end='')
+                for key, value in depth_counts.items():
+                    print(f"Depth {key} {value}")
+                print(f"\nComputer {self.next_player.name}: ", end='')
                 print(result)
-                print(f"Branching Factor: {self.determine_branching_factor()}")
-                print(f"Total evals: {tree.total_evals}")
                 with open(
                         "gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
                                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
@@ -926,6 +928,7 @@ class Game:
                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
             file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
             file.write(f"Heuristic score:  {score:0.2f}\n")
+            file.write(f"Cumulative total evals: {tree.total_evals}\n")
             file.write(f"Evals per depth: ")
             for k in sorted(tree.stats.keys()):
                 file.write(f"{k}:{tree.stats[k]} ")
@@ -936,22 +939,19 @@ class Game:
             file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
 
         print(f"Heuristic score: {score}")
+        print(f"Cumulative total evals: {tree.total_evals}")
         print(f"Evals per depth: ", end='')
         for k in sorted(tree.stats.keys()):
             print(f"{k}:{tree.stats[k]} ", end='')
         print()
         for k in sorted(tree.stats.keys()):
-            print(f"{k}:{int(tree.stats[k] / tree.total_evals) * 100}% ", end='')
+            print(f"{k}:{int((tree.stats[k] * 100) / tree.total_evals)}% ", end='')
         print()
 
         if self.stats.total_seconds > 0:
             print(f"Eval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
 
-        print(f"Number of games states for this move: \n", end='')
-        for key, value in depth_counts.items():
-            print(f"Depth {key}: {value}")
-
-        print(f"\nElapsed time: {elapsed_seconds:0.1f}s")
+        print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         if elapsed_seconds > self.options.max_time:
             print("AI took too long to make a move")
             print(time_ratio)
@@ -959,8 +959,7 @@ class Game:
 
         return move
 
-        """Check if generating game states is taking too much time"""
-
+    """Check if generating game states is taking too much time"""
     def check_time_limit(self):
         global time_limit_exceeded, time_ratio
         current_time = datetime.now()
