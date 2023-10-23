@@ -27,6 +27,8 @@ time_elapsed_last_move = 0
 MAX_HEURISTIC_SCORE = 2000000000
 MIN_HEURISTIC_SCORE = -2000000000
 
+ID = 0
+
 
 class UnitType(Enum):
     """Every unit type."""
@@ -208,6 +210,7 @@ class CoordPair:
     """Representation of a game move or a rectangular area via 2 Coords."""
     src: Coord = field(default_factory=Coord)
     dst: Coord = field(default_factory=Coord)
+    
 
     def to_string(self) -> str:
         """Text representation of a CoordPair."""
@@ -266,7 +269,7 @@ class Options:
     game_type: GameType = GameType.AttackerVsDefender
     alpha_beta: bool | None= True
     max_turns: int | None = 100
-    randomize_moves: bool = False #only for D1
+    randomize_moves: bool = False  # only for D1
     broker: str | None = None
 
 
@@ -309,25 +312,21 @@ class Tree:
     def __init__(self):
         self.root = None
         self.nodes = {}
-        self.stats = Stats
+        self.stats={}
+        self.total_evals=0
+        self.depth=0
 
-    def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None,
-                 parent: TreeNode = None):
-        max_value = parent is None or not self.nodes[parent].max
-
-        # Calculate the depth for the new node
-        if parent is None:
-            depth = 1  # Root node, starting depth of tree at 1
-        else:
-            depth = self.nodes[parent].depth + 1
-
-        node = TreeNode(id, game, move, e1=e1, e2=e2, max=max_value, depth=depth)
+    def add_node(self, id: int, game: Game, move: CoordPair = None, e1: int = None, e2: int = None, parent: TreeNode = None):
+        max_value = parent is None or not self.nodes[parent].max  # sets if its maximizing or minimizing
+        node = TreeNode(id, game, move, e1=e1, e2=e2, max=max_value)
         self.nodes[id] = node
 
         if parent is None:
             self.root = node
+             depth = 1  # Root node, starting depth of tree at 1
         else:
             parent_node = self.nodes[parent]
+            node.depth = self.nodes[parent].depth + 1
             parent_node.children.append(node)
 
     # Sort level by level from the root to the leafs
@@ -380,9 +379,14 @@ class Tree:
                     min_child = child
             node.e1 = min_value
             return min_value, min_child
+        
+    def calculate_evaluations(self, depth: int ): #temp_evals: int
+        self.total_evals+=1
+        self.stats[depth]=self.total_evals
+
 
     def alpha_beta_pruning(self, node=None):
-        # total_evals=0
+        tree.depth+=1
         # If not given, starting node is root
         if node is None:
             node = self.root
@@ -393,7 +397,7 @@ class Tree:
 
     def _alpha_beta_pruning(self, node, alpha, beta):
         if not node.children:  # Leaf node
-            # self.stats.evaluations_per_depth[0:total_evals]
+            self.calculate_evaluations(tree.depth)
             node.e2 = node.game.heuristic_2()
             return node.e2, node
 
@@ -572,8 +576,8 @@ class Game:
                 for adjacent_coordinate in coords.src.iter_adjacent():
                     if self.is_valid_coord(adjacent_coordinate) and not self.is_empty(adjacent_coordinate) and self.get(
                             adjacent_coordinate).player != src.player:
-                        return False, "Invalid move", "Sorry, this player is engaged in combat."
 
+                        return False, "Invalid move", "Sorry, this player is engaged in combat."
 
         # if src is Tech or Virus, player can move regardless of being in combat
         # if dst is not empty, src may be attacking, but Tech might also be repairing
@@ -674,6 +678,25 @@ class Game:
                 self.log_move(move_type, coords)
                 self.perform_self_destruction(coords)
                 return (True, "Self-destruction initiated")
+            
+    def ai_move(self, coords: CoordPair) -> Tuple[bool, str]:
+        """Validate and perform a move expressed as a CoordPair."""
+        is_valid, move_type, error = self.is_valid_move(coords)
+        if is_valid:
+            if move_type == "valid move":
+                self.set(coords.dst, self.get(coords.src))
+                self.set(coords.src, None)
+                return (True, "Move initiated")
+            if move_type == "attack":
+                self.perform_attack(coords)
+                return (True, "Attack initiated")
+            if move_type == "repair":
+                self.perform_repair(coords)
+                return (True, "Repair initiated")
+            if move_type == "self-destruct":
+                self.perform_self_destruction(coords)
+                return (True, "Self-destruction initiated")
+
 
         print(error)
         return (False, "Invalid move",)
@@ -710,9 +733,16 @@ class Game:
             output += "\n"
         with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
-            file.write("Board:\n" + output)
+            file.write(f"Board:\n  {output}")
 
         return output
+    def determine_branching_factor(self):
+        try:
+            branching_factor=CHILDREN/PARENT
+        except ZeroDivisionError:
+            branching_factor=0
+        return branching_factor
+        
 
     def determine_branching_factor(self):
         try:
@@ -743,6 +773,7 @@ class Game:
                 print('Invalid coordinates! Try again.')
 
     def human_turn(self):
+        global current_node_id
         """Human player plays a move (or get via broker)."""
         global current_node_id
         if self.options.broker is not None:
@@ -767,8 +798,7 @@ class Game:
                     self.next_turn()
 
                     # If human is playing against AI, update the current_node of tree
-                    if (
-                            self.options.game_type == GameType.AttackerVsComp and current_node_id > 0) or self.options.game_type == GameType.CompVsDefender:
+                    if (self.options.game_type == GameType.AttackerVsComp and current_node_id > 0) or self.options.game_type == GameType.CompVsDefender:
                         for child in tree.nodes[current_node_id].children:
                             if child.game == self:
                                 current_node_id = child.id
@@ -783,14 +813,14 @@ class Game:
         if mv is not None:
             (success, result) = self.perform_move(mv)
             if success:
+                print(f"tree size {len(tree.nodes)}")
                 print(f"Computer {self.next_player.name}: ", end='')
                 print(result)
-
                 print(f"branching factor {self.determine_branching_factor()}")
-                with open(
-                        "gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
-                            self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
-                    file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
+                print(f"Total evals {tree.total_evals}")
+                with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+                    file.write(f"branching factor {self.determine_branching_factor()}\n")
                 self.next_turn()
         return mv
 
@@ -885,15 +915,35 @@ class Game:
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         time_elapsed_last_move = elapsed_seconds
         self.stats.total_seconds += elapsed_seconds
-        print(f"Heuristic score: {score:0.2f}")
-        print(f"Evals per depth: ", end='')
-        for k in sorted(self.stats.evaluations_per_depth.keys()):
-            print(f"{k}:{self.stats.evaluations_per_depth[k]} ", end='')
-        print()
-        total_evals = sum(self.stats.evaluations_per_depth.values())
-        if self.stats.total_seconds > 0:
-            print(f"Eval perf.: {total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
 
+        elapsed_seconds = (datetime.now() - start_time).total_seconds()
+        self.stats.total_seconds += elapsed_seconds
+        with open("gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
+                self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+            file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
+            file.write(f"Heuristic score:  {score:0.2f}\n")
+            file.write(f"Evals per depth: ")
+            for k in sorted(tree.stats.keys()):
+                file.write(f"{k}:{tree.stats[k]} ")
+            for k in sorted(tree.stats.keys()):
+                file.write(f"{k}:{int(tree.stats[k]/tree.total_evals)*100}% ")
+            if self.stats.total_seconds > 0:
+                file.write(f"\nEval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
+            file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
+        
+        print(f"Heuristic score: {score}")
+        print(f"Average recursive depth: {avg_depth:0.1f}")
+        print(f"Evals per depth: ", end='')
+        for k in sorted(tree.stats.keys()):
+            print(f"{k}:{tree.stats[k]} ", end='')
+        print()
+        for k in sorted(tree.stats.keys()):
+            print(f"{k}:{int(tree.stats[k]/tree.total_evals)*100}% ", end='')
+        print()
+       
+        if self.stats.total_seconds > 0:
+            print(f"Eval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
+        
         print(f"Number of games states for this move: \n", end='')
         for key, value in depth_counts.items():
             print(f"Depth {key}: {value}")
@@ -908,13 +958,14 @@ class Game:
         tree.print_tree_to_file_alphabeta("tree-alpha.txt", current_node)
         return move
 
-    """Check if generating game states is taking too much time"""
+        """Check if generating game states is taking too much time"""
     def check_time_limit(self):
         global time_limit_exceeded, time_ratio
         current_time = datetime.now()
         elapsed_time = (current_time - start_time).total_seconds()
         if elapsed_time > time_ratio * self.options.max_time:
             time_limit_exceeded = True
+
 
     """Initializes the game tree by adding the root node"""
     def initialize_game_tree(self):
@@ -927,7 +978,7 @@ class Game:
         self.check_time_limit()
         if time_limit_exceeded:
             return
-        #
+        
         for coord, _ in self.player_units(self.next_player):
             self.generate_unit_moves(coord, parent)
 
@@ -1069,26 +1120,24 @@ class Game:
 
         return attacker_score - defender_score
 
-    """ e1, trivial e, that adds health and weight """
-    def heuristic_1(
-            self) -> int:  # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
+    def heuristic_1(self) -> int: # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
         attacker_score = 0
         defender_score = 0
-
+            
         for coord, unit in self.player_units(Player.Attacker):
             if unit.type == UnitType.Virus:
                 attacker_score += 20
-                attacker_score += unit.health * 2
+                attacker_score += unit.health*2
             elif unit.type == UnitType.Tech:
                 attacker_score += 20
-                attacker_score += unit.health * 2
+                attacker_score += unit.health*2
             elif unit.type == UnitType.Firewall:
                 attacker_score += 15
-                attacker_score += unit.health * 1.5
+                attacker_score += unit.health*1.5
             elif unit.type == UnitType.Program:
                 attacker_score += 10
-                attacker_score += unit.health * 1
+                attacker_score += unit.health*1
             elif unit.type == UnitType.AI:
                 attacker_score += 9999
 
@@ -1179,6 +1228,21 @@ class Game:
 
         return attacker_score - defender_score
 
+
+                defender_score += unit.health*2
+            elif unit.type == UnitType.Tech:
+                defender_score += 20
+                defender_score += unit.health*2
+            elif unit.type == UnitType.Firewall:
+                defender_score += 15
+                defender_score += unit.health*1.5
+            elif unit.type == UnitType.Program:
+                defender_score += 10
+                defender_score += unit.health*1
+            elif unit.type == UnitType.AI:
+                defender_score += 9999
+                
+        return attacker_score-defender_score
 
     def post_move_to_broker(self, move: CoordPair):
         """Send a move to the game broker."""
@@ -1295,6 +1359,9 @@ def main():
     while True:
         print()
         print(game)
+        # with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
+        #     options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
+        #     file.write(game.to_string())
         winner = game.has_winner()
         if winner is not None:
             with open("gameTrace-<" + str(options.alpha_beta) + ">-<" + str(options.max_time) + ">-<" + str(
