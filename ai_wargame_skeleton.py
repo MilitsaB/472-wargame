@@ -928,6 +928,7 @@ class Game:
                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
             file.write(f"\nbranching factor {self.determine_branching_factor()}\n")
             file.write(f"Heuristic score:  {score:0.2f}\n")
+            file.write(f"Heuristic used: {'e2' if self.options.alpha_beta else 'e1'}\n")
             file.write(f"Cumulative total evals: {tree.total_evals}\n")
             file.write(f"Evals per depth: ")
             for k in sorted(tree.stats.keys()):
@@ -939,6 +940,13 @@ class Game:
             file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
 
         print(f"Heuristic score: {score}")
+        print(f"Heuristic used: {'e2' if self.options.alpha_beta else 'e1'}") # change to e0 if used
+        print(f"Elapsed time: {elapsed_seconds:0.1f}s\n")
+        if elapsed_seconds > self.options.max_time:
+            print("AI took too long to make a move")
+            print(time_ratio)
+            return
+
         print(f"Cumulative total evals: {tree.total_evals}")
         print(f"Evals per depth: ", end='')
         for k in sorted(tree.stats.keys()):
@@ -950,12 +958,6 @@ class Game:
 
         if self.stats.total_seconds > 0:
             print(f"Eval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
-
-        print(f"Elapsed time: {elapsed_seconds:0.1f}s")
-        if elapsed_seconds > self.options.max_time:
-            print("AI took too long to make a move")
-            print(time_ratio)
-            return
 
         return move
 
