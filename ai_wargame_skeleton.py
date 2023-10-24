@@ -354,6 +354,7 @@ class Tree:
 
         # Check if the node is a leaf node (no need to do any minmax on leaf)
         if not node.children:
+            self.calculate_evaluations(node.depth)
             node.e1 = node.game.heuristic_1()  # change call to heuristic here
             return node.e1, None
 
@@ -682,6 +683,7 @@ class Game:
                 print(error)
             return (False, "Invalid move")
 
+    """ No logging of game states"""
     def ai_move(self, coords: CoordPair) -> Tuple[bool, str]:
         """Validate and perform a move expressed as a CoordPair."""
         is_valid, move_type, error = self.is_valid_move(coords)
@@ -739,6 +741,7 @@ class Game:
 
         return output
 
+    """ Branching factor is total number of children divided by total number of parents in the tree"""
     def determine_branching_factor(self):
         try:
             branching_factor = (len(tree.nodes)-1) / PARENT
@@ -868,8 +871,8 @@ class Game:
         else:
             return (0, None, 0)
 
-    """Suggest the next move using minimax alpha beta"""
 
+    """Suggest the next move using minimax alpha beta"""
     def suggest_move(self) -> CoordPair | None:
         global current_node_id, start_time, time_limit_exceeded, depth_counts, last_algo_time, time_ratio, time_elapsed_last_move
 
@@ -881,8 +884,8 @@ class Game:
         # this can be changed according to max_time that user will want to use,
         # if you have issues, just comment them out and set them to 50
         """ Adjust these to your own computer capacity """
-        avg_ratio = 0.50
-        lowest_ratio = 0.3
+        avg_ratio = 0.25
+        lowest_ratio = 0.20
         highest_ratio = 0.85
         if last_algo_time == 0:
             if self.options.max_depth > 6:
@@ -975,14 +978,12 @@ class Game:
             time_limit_exceeded = True
 
     """Initializes the game tree by adding the root node"""
-
     def initialize_game_tree(self):
         global ID
         tree.add_node(ID, game=self, parent=None)  # starting by a max
         ID += 1
 
     """Iterates over the board's dimensions until unit of the player is found"""
-
     def generate_game_states(self, parent=None):
         self.check_time_limit()
         if time_limit_exceeded:
@@ -1128,7 +1129,7 @@ class Game:
 
         return attacker_score - defender_score
 
-    """ e1, trivial heuristic"""
+    """ e1, trivial heuristic, checking the number of units, assigning weight and health weight"""
     def heuristic_1(
             self) -> int:  # directions = [(0, -1), (-1, 0), (1, 0), (0, 1), (0, 0)]  # Up, Left, Right, Down, Self-destruct
 
@@ -1193,12 +1194,13 @@ class Game:
 
                     # Other scoring based on the player and unit type
                     if unit.player == Player.Attacker:
-                        attacker_score += random.randrange(30)
+                        attacker_score += random.randrange(30)  # to escape constant games
                         if unit.type == UnitType.Virus:
                             attacker_score += 20 + unit.health * 2
+                            # the closer the virus to AI, the better
                             if defender_ai_coord:
                                 distance_to_opponent_ai = coord.euclidean_distance_to(defender_ai_coord)
-                                attacker_score += 50 / (distance_to_opponent_ai + 1)
+                                attacker_score += 100 / (distance_to_opponent_ai + 1)
                         elif unit.type == UnitType.Tech:
                             attacker_score += 20 + unit.health * 2
                         elif unit.type == UnitType.Firewall:
@@ -1221,6 +1223,7 @@ class Game:
                         elif unit.type == UnitType.AI:
                             defender_score += 9999
 
+                    # mobility aspect added, if it can more, its better
                     for adj_coord in coord.iter_all8_adjacent():
                         if self.is_valid_coord(adj_coord) and self.is_valid_move(CoordPair(coord, adj_coord)):
                             if unit.player == Player.Attacker:
@@ -1233,7 +1236,7 @@ class Game:
             for opp_coord, opp_unit in self.player_units(Player.Attacker):
                 if opp_unit.type == UnitType.Virus:
                     distance_to_virus = defender_ai_coord.euclidean_distance_to(opp_coord)
-                    defender_score -= 50 / (distance_to_virus + 1)  # Negative score for potential threat
+                    defender_score -= 100 / (distance_to_virus + 1)  # Negative score for potential threat
 
         return attacker_score - defender_score
 
