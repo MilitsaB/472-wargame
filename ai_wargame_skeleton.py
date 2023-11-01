@@ -824,7 +824,7 @@ class Game:
                 with open(
                         "gameTrace-<" + str(self.options.alpha_beta) + ">-<" + str(self.options.max_time) + ">-<" + str(
                                 self.options.max_turns) + ">.txt", "a", encoding="utf-8") as file:
-                    file.write(f"Branching Factor: {self.determine_branching_factor()}\n")
+                    file.write(f"\nBranching Factor: {self.determine_branching_factor()}\n")
                 self.next_turn()
         return mv
 
@@ -941,8 +941,9 @@ class Game:
             file.write(f"Evals per depth: ")
             for k in sorted(tree.stats.keys()):
                 file.write(f"{k}:{tree.stats[k]} ")
+            file.write(f"\n")
             for k in sorted(tree.stats.keys()):
-                file.write(f"{k}:{int(tree.stats[k] / tree.total_evals) * 100}% ")
+                file.write(f"{k}:{int((tree.stats[k] * 100) / tree.total_evals)}% ")
             if self.stats.total_seconds > 0:
                 file.write(f"\nEval perf.: {tree.total_evals / self.stats.total_seconds / 1000:0.1f}k/s")
             file.write(f"\nElapsed time: {elapsed_seconds:0.1f}s")
@@ -1019,7 +1020,7 @@ class Game:
             # if move is valid, perform move
             if result:
                 new_board = tree.nodes[parent].game.clone()
-                new_board.perform_move(next_move)
+                new_board.ai_move(next_move)
                 new_board.next_turn()
                 e1 = None
 
@@ -1037,7 +1038,7 @@ class Game:
                 # and already has low health or is surrounded by enemy players
                 next_move = CoordPair(coord, coord)
                 new_board = tree.nodes[parent].game.clone()
-                new_board.perform_move(next_move)
+                new_board.ai_move(next_move)
                 new_board.next_turn()
                 e1 = None
 
